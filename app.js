@@ -9,8 +9,6 @@
   'use strict';
 
   const canvas = document.getElementById('matrix');
-  const debugOverlayEl = document.getElementById('debugOverlay');
-  const showDebugEl = document.getElementById('showDebug');
   const ctx = canvas.getContext('2d', { alpha: false });
 
   // HUD elements (guarded)
@@ -90,23 +88,6 @@
   let lastOpsExceededAt = 0;
   let chunkCursor = 0;
   const MAX_QUEUE = 9000;
-  let lastInjected = '';
-  let lastRequestInfo = '';
-  let lastResponseInfo = '';
-  function setDebugVisible(on){
-    if (!debugOverlayEl) return;
-    debugOverlayEl.classList.toggle('hidden', !on);
-  }
-  function updateDebug(){
-    if (!debugOverlayEl || debugOverlayEl.classList.contains('hidden')) return;
-    const q = (typeof dataQueue !== 'undefined') ? dataQueue.length : 0;
-    debugOverlayEl.textContent =
-      `QUEUE: ${q}\n` +
-      (lastRequestInfo ? `REQ: ${lastRequestInfo}\n` : '') +
-      (lastResponseInfo ? `RES: ${lastResponseInfo}\n` : '') +
-      `INJECT: ${lastInjected}`;
-  }
-
   // Standardtaggar: fyll i era 10 taggar här (exakta namn).
   // Alternativt: klicka "Hämta /Tag" så auto-fylls första 10 om fältet är tomt.
   const DEFAULT_TAGS = [];
@@ -222,27 +203,37 @@
     try {
       const compact = extractCompactStream(payload);
       if (compact) {
-        lastInjected = compact;
-        const rep = repeatFactor();
-        for (let i = 0; i < rep; i++) enqueueToken(' ' + compact + '   ');
-        updateDebug();
+        enqueueToken(' ' + compact + ' ');
         return;
       }
       const toks = flattenToTokens(payload);
       if (toks.length === 0) return;
-      const flat = toks.join('').slice(0, 1600);
-      lastInjected = flat;
-      enqueueToken(flat);
-      updateDebug();
+      enqueueToken(toks.join('').slice(0, 1600));
     } catch {}
   }
-  function takeTokenOrRandom(charset) {
-    if (dataQueue.length > 0) {
-      while (dataQueue.length > 0) {
-        const c = dataQueue.shift();
-        if (c && !/\s/.test(c)) return c; // skip whitespace
-      }
+
+  let liveRepeatLeft = 0;
+  let liveChar = '';
+  function nextLiveChar(){
+    if (dataQueue.length === 0) return '';
+    // Skip whitespace so it doesn't look like "no data" in the stream
+    while (dataQueue.length > 0) {
+      const c = dataQueue.shift();
+      if (c && !/\s/.test(c)) return c;
     }
+    return '';
+  }
+  function takeTokenOrRandom(charset) {
+    // Always use queue when it has data, but repeat chars to avoid draining too fast
+    if (dataQueue.length > 0) {
+      if (liveRepeatLeft <= 0) {
+        liveChar = nextLiveChar() || charset[(Math.random() * charset.length) | 0];
+        liveRepeatLeft = repeatFactor();
+      }
+      liveRepeatLeft--;
+      return liveChar;
+    }
+    liveRepeatLeft = 0;
     return charset[(Math.random() * charset.length) | 0];
   }
 
@@ -463,11 +454,6 @@
     const url = base + 'MeasurementMulti';
 
     const body = buildMeasurementBody(tagsChunk);
-    try {
-      const tCount = Array.isArray(body.TagName) ? body.TagName.length : 0;
-      lastRequestInfo = `/MeasurementMulti tags=${tCount} Start=${body.StartTime} End=${body.EndTime} res=${body.ResolutionType}${body.ResolutionNumber}`;
-      updateDebug();
-    } catch {}
     if (!Array.isArray(body.TagName) || body.TagName.length === 0) {
       setApiStatus('API: lägg in minst 1 TagName (en per rad)');
       return false;
@@ -492,11 +478,6 @@
 
       if (!res.ok) {
         const body = buildMeasurementBody(tagsChunk);
-    try {
-      const tCount = Array.isArray(body.TagName) ? body.TagName.length : 0;
-      lastRequestInfo = `/MeasurementMulti tags=${tCount} Start=${body.StartTime} End=${body.EndTime} res=${body.ResolutionType}${body.ResolutionNumber}`;
-      updateDebug();
-    } catch {}
         const snippet = (typeof payload === 'string') ? String(payload).slice(0, 180) : '';
         const opsExceeded = (typeof payload === 'string') && payload.toLowerCase().includes('exceeded allowed read operations');
         if (opsExceeded) {
@@ -527,7 +508,6 @@
 
       // If the API returns empty arrays, it usually means the interval+resolution produced 0 points.
       const anyData = payloadHasAnyData(payload);
-      try { lastResponseInfo = `HTTP ${res.status} OK` + (anyData ? '' : ' (0 punkter)'); updateDebug(); } catch {}
       if (!anyData) {
         enqueueToken(' NO_DATA ');
       }
@@ -614,9 +594,6 @@
   if (trailEl) trailEl.value = saved.trail ?? 0.08;
   if (speedEl) speedEl.value = saved.speed ?? 0.7;
   if (repeatEl) repeatEl.value = saved.repeat ?? 4;
-  if (showDebugEl) showDebugEl.checked = saved.showDebug ?? false;
-  setDebugVisible(showDebugEl?.checked);
-  updateDebug();
   if (tagsEl) tagsEl.value = saved.tags ?? '';
   if (tagsEl && !tagsEl.value.trim() && Array.isArray(DEFAULT_TAGS) && DEFAULT_TAGS.length) {
     tagsEl.value = DEFAULT_TAGS.slice(0, 10).join('\n');
@@ -641,7 +618,6 @@
       trail: Number(trailEl?.value || 0.08),
       speed: Number(speedEl?.value || 0.7),
       repeat: Number(repeatEl?.value || 4),
-      showDebug: Boolean(showDebugEl?.checked),
       tags: tagsEl?.value || '',
       startTime: startTimeEl?.value || '',
       endTime: endTimeEl?.value || '',
@@ -655,13 +631,8 @@
     }));
   }
 
-  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, speedEl, repeatEl, showDebugEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl, fetchModeEl].filter(Boolean);
+  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, speedEl, repeatEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl, fetchModeEl].filter(Boolean);
   for (const el of settingEls) el.addEventListener('change', persistSettings);
-  if (showDebugEl) showDebugEl.addEventListener('change', () => {
-    setDebugVisible(showDebugEl.checked);
-    persistSettings();
-    updateDebug();
-  });
 
   // Buttons
   if (btnLoadTags) btnLoadTags.addEventListener('click', fetchTags);
