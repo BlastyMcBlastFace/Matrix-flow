@@ -44,7 +44,7 @@
 
       <label class="hud__label">
         Taggar per request
-        <input id="chunkSize" class="hud__input" type="number" min="1" max="10" step="1" value="2" />
+        <input id="chunkSize" class="hud__input" type="number" min="1" max="10" step="1" value="1" />
       </label>
 
       <label class="hud__label">
@@ -92,15 +92,15 @@
         ResolutionType
         <select id="resType" class="hud__select">
           <option value="s">s</option>
-          <option value="m">m</option>
-          <option value="h" selected>h</option>
+          <option value="m" selected>m</option>
+          <option value="h">h</option>
           <option value="d">d</option>
         </select>
       </label>
 
       <label class="hud__label">
         ResolutionNumber
-        <input id="resNum" class="hud__input" type="number" min="1" step="1" value="1" />
+        <input id="resNum" class="hud__input" type="number" min="1" step="1" value="10" />
       </label>
     </div>
 
@@ -120,6 +120,17 @@
       </label>
     </div>
 
+    <div class="hud__grid">
+      <label class="hud__label">
+        Hämtning
+        <select id="fetchMode" class="hud__select">
+          <option value="window" selected>Fönster (Start–End)</option>
+          <option value="point">En punkt (Start=End, senaste minut)</option>
+        </select>
+      </label>
+      <div></div>
+    </div>
+
     <div class="hud__actions">
       <button id="btnLoadTags" class="hud__action" type="button">Hämta /Tag</button>
       <button id="btnTestMeas" class="hud__action" type="button">Testa /MeasurementMulti</button>
@@ -135,3 +146,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
