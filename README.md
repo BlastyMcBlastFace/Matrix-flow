@@ -52,3 +52,15 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## Standard: 10 taggar
 - Klicka **Hämta /Tag**: om taggfältet är tomt fylls **första 10 taggarna** automatiskt.
 - Vill du ha fasta 10 taggar oavsett /Tag-ordning: öppna `app.js` och fyll `DEFAULT_TAGS = [ ... ]`.
+
+
+## v5.5 — chunkade requests (för 403 'exceeded allowed read operations')
+- Du kan visa 10 taggar totalt men anropa API:t i mindre "bitar".
+- **Taggar per request** (default 2) gör att varje anrop blir billigare.
+- Rekommendation: Senaste-läge + lookback 5–10 min + chunk=1–2 + poll 10s.
+
+
+## v5.6 — viktigt fix
+- Knappen **Testa /MeasurementMulti** använder nu samma "Taggar per request" (chunk) som polling.
+- Statusraden visar nu `tags=<antal>` så du ser att requesten verkligen är chunkad.
+- Vid "exceeded allowed read operations" backar den automatiskt till `chunk=1` och höjer poll till minst 15 s.

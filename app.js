@@ -17,6 +17,7 @@
   const baseUrlEl = document.getElementById('baseUrl');
   const tokenEl = document.getElementById('token');
   const pollMsEl = document.getElementById('pollMs');
+  const chunkSizeEl = document.getElementById('chunkSize');
   const charsetEl = document.getElementById('charset');
   const trailEl = document.getElementById('trail');
   const tagsEl = document.getElementById('tags');
@@ -73,6 +74,7 @@
   // Adaptive throttling when API rejects with "exceeded allowed read operations"
   let adaptiveFactor = 1; // increases 1,2,4,8...
   let lastOpsExceededAt = 0;
+  let chunkCursor = 0;
   const MAX_QUEUE = 9000;
   // Standardtaggar: fyll i era 10 taggar här (exakta namn).
   // Alternativt: klicka "Hämta /Tag" så auto-fylls första 10 om fältet är tomt.
@@ -193,10 +195,12 @@
     return text;
   }
 
-  function buildMeasurementBody() {
-    const rawTagsAll = (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+  function buildMeasurementBody(tagsOverride) {
+    const rawTagsAll = Array.isArray(tagsOverride)
+      ? tagsOverride
+      : (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
     // Hard cap to avoid massive read operations if someone pastes hundreds of tags
-    const MAX_TAGS = 20;
+    const MAX_TAGS = 10; // user wants 10 standard
     const rawTags = rawTagsAll.slice(0, MAX_TAGS);
     const tagsTruncated = rawTagsAll.length > MAX_TAGS;
 
@@ -305,12 +309,12 @@
     }
   }
 
-  async function fetchMeasurementOnce() {
+  async function fetchMeasurementOnce(tagsChunk) {
     const base = cleanBaseUrl();
     if (!base) { setApiStatus('API: sätt API-bas först'); return false; }
     const url = base + 'MeasurementMulti';
 
-    const body = buildMeasurementBody();
+    const body = buildMeasurementBody(tagsChunk);
     if (!Array.isArray(body.TagName) || body.TagName.length === 0) {
       setApiStatus('API: lägg in minst 1 TagName (en per rad)');
       return false;
@@ -334,7 +338,7 @@
       let payload = ct.includes('application/json') ? await res.json() : parseMaybeJson(await res.text());
 
       if (!res.ok) {
-        const body = buildMeasurementBody();
+        const body = buildMeasurementBody(tagsChunk);
         const snippet = (typeof payload === 'string') ? String(payload).slice(0, 180) : '';
         const opsExceeded = (typeof payload === 'string') && payload.toLowerCase().includes('exceeded allowed read operations');
         if (opsExceeded) {
@@ -342,13 +346,18 @@
           const now = Date.now();
           if (now - lastOpsExceededAt > 2000) { // avoid spamming bumps
             adaptiveFactor = Math.min(64, adaptiveFactor * 2);
+            // Reduce chunk size to minimum to survive strict limits
+            try { if (chunkSizeEl) chunkSizeEl.value = 1; } catch {}
+            // Slow down slightly
+            try { if (pollMsEl && Number(pollMsEl.value) < 15000) pollMsEl.value = 15000; } catch {}
             lastOpsExceededAt = now;
           }
         }
         const tagCountAll = (tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).length;
         const capNote = tagCountAll > 20 ? ' · taggar: kapade till 20' : '';
         const adaptNote = adaptiveFactor > 1 ? ` · adaptive×${adaptiveFactor}` : '';
-        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime}`
+        const tagCountReq = Array.isArray(tagsChunk) ? tagsChunk.length : ((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).slice(0,10).length);
+        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime} · tags=${tagCountReq}`
           + (snippet ? ` · ${snippet}` : '')
           + capNote + adaptNote
         );
@@ -360,12 +369,13 @@
       normalizeApiPayload(payload);
       // Update delta cursor only on success
       try {
-        const bodyUsed = buildMeasurementBody();
+        const bodyUsed = buildMeasurementBody(tagsChunk);
         const eD = parseLocalYYYYMMDDHHmm(bodyUsed.EndTime);
         if (eD) lastSuccessfulEndDate = eD;
       } catch {}
       const bodyUsed2 = buildMeasurementBody();
-      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length}`
+      const tagCountReq = Array.isArray(tagsChunk) ? tagsChunk.length : ((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).slice(0,10).length);
+      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length} · tags=${tagCountReq}`
         + (adaptiveFactor > 1 ? ` · adaptive×${adaptiveFactor}` : '')
         + (((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).length) > 20 ? ' · taggar: kapade till 20' : '')
       );
@@ -386,8 +396,17 @@
 
     const loop = async () => {
       if (!alive) return;
-      await fetchMeasurementOnce();
-      const ms = Math.max(200, Number(pollMsEl?.value || 3000));
+      // Chunk tag list to avoid API read-operation limits
+      const allTags = (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+      const maxTags = 10;
+      const tags = allTags.slice(0, maxTags);
+      const chunkSize = Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 2)));
+      const chunks = [];
+      for (let i = 0; i < tags.length; i += chunkSize) chunks.push(tags.slice(i, i + chunkSize));
+      const chunk = chunks.length ? chunks[chunkCursor % chunks.length] : [];
+      chunkCursor = (chunkCursor + 1) % Math.max(1, chunks.length);
+      await fetchMeasurementOnce(chunk);
+      const ms = Math.max(500, Number(pollMsEl?.value || 10000));
       setTimeout(loop, ms);
     };
     loop();
@@ -424,6 +443,7 @@
   if (baseUrlEl) baseUrlEl.value = saved.baseUrl ?? 'https://acurve.kappala.se:50001/api/v1/';
   if (tokenEl) tokenEl.value = saved.token ?? '';
   if (pollMsEl) pollMsEl.value = saved.pollMs ?? 10000;
+  if (chunkSizeEl) chunkSizeEl.value = saved.chunkSize ?? 2;
   if (charsetEl) charsetEl.value = saved.charset ?? 'matrix';
   if (trailEl) trailEl.value = saved.trail ?? 0.08;
   if (tagsEl) tagsEl.value = saved.tags ?? '';
@@ -444,6 +464,7 @@
       baseUrl: baseUrlEl?.value || '',
       token: tokenEl?.value || '',
       pollMs: Number(pollMsEl?.value || 3000),
+      chunkSize: Number(chunkSizeEl?.value || 2),
       charset: charsetEl?.value || 'matrix',
       trail: Number(trailEl?.value || 0.08),
       tags: tagsEl?.value || '',
@@ -458,12 +479,19 @@
     }));
   }
 
-  const settingEls = [baseUrlEl, tokenEl, pollMsEl, charsetEl, trailEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl].filter(Boolean);
+  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl].filter(Boolean);
   for (const el of settingEls) el.addEventListener('change', persistSettings);
 
   // Buttons
   if (btnLoadTags) btnLoadTags.addEventListener('click', fetchTags);
-  if (btnTestMeas) btnTestMeas.addEventListener('click', fetchMeasurementOnce);
+  if (btnTestMeas) btnTestMeas.addEventListener('click', async () => {
+    const allTags = (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+    const tags = allTags.slice(0, 10);
+    const chunkSize = Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 2)));
+    const chunk = tags.slice(0, chunkSize);
+    chunkCursor = 0;
+    await fetchMeasurementOnce(chunk);
+  });
 
   function applyMode() {
     const mode = (modeEl?.value || 'poll').toLowerCase();
@@ -475,7 +503,10 @@
       stopDemo();
       startPolling();
       const tm = (timeModeEl?.value || 'manual').toLowerCase();
-      setApiStatus('API: kör polling mot /MeasurementMulti' + (tm === 'latest' ? ' · Strömmande senaste (rullande fönster)' : ' · Manuell tid') + ' (tryck "Testa" för direktanrop)');
+      const cs = Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 2)));
+      setApiStatus('API: kör polling mot /MeasurementMulti' + (tm === 'latest' ? ' · Strömmande senaste' : ' · Manuell tid')
+        + ` · chunk=${cs}`
+        + ' (tryck "Testa" för direktanrop)');
     }
   }
   if (modeEl) modeEl.addEventListener('change', applyMode);
