@@ -28,6 +28,7 @@
   const tsTypeEl = document.getElementById('tsType');
   const timeModeEl = document.getElementById('timeMode');
   const lookbackMinEl = document.getElementById('lookbackMin');
+  const fetchModeEl = document.getElementById('fetchMode');
   const modeEl = document.getElementById('mode');
   const apiStatusEl = document.getElementById('apiStatus');
   const btnLoadTags = document.getElementById('btnLoadTags');
@@ -226,6 +227,11 @@
 
       end = formatLocalYYYYMMDDHHmm(endDate);
       start = formatLocalYYYYMMDDHHmm(startDate);
+      const fm = (fetchModeEl?.value || 'window').toLowerCase();
+      if (fm === 'point') {
+        // Ask for a single point at EndTime (some APIs treat this as cheapest)
+        start = end;
+      }
     }
 
     // Resolution
@@ -357,7 +363,8 @@
         const capNote = tagCountAll > 20 ? ' · taggar: kapade till 20' : '';
         const adaptNote = adaptiveFactor > 1 ? ` · adaptive×${adaptiveFactor}` : '';
         const tagCountReq = Array.isArray(tagsChunk) ? tagsChunk.length : ((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).slice(0,10).length);
-        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime} · tags=${tagCountReq}`
+        const chunk = Array.isArray(tagsChunk) ? tagsChunk.length : Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 1)));
+        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime} · tags=${tagCountReq} · res=${body.ResolutionType}${body.ResolutionNumber} · chunk=${chunk}`
           + (snippet ? ` · ${snippet}` : '')
           + capNote + adaptNote
         );
@@ -375,7 +382,8 @@
       } catch {}
       const bodyUsed2 = buildMeasurementBody();
       const tagCountReq = Array.isArray(tagsChunk) ? tagsChunk.length : ((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).slice(0,10).length);
-      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length} · tags=${tagCountReq}`
+      const chunk = Array.isArray(tagsChunk) ? tagsChunk.length : Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 1)));
+      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length} · tags=${tagCountReq} · res=${bodyUsed2.ResolutionType}${bodyUsed2.ResolutionNumber} · chunk=${chunk}`
         + (adaptiveFactor > 1 ? ` · adaptive×${adaptiveFactor}` : '')
         + (((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).length) > 20 ? ' · taggar: kapade till 20' : '')
       );
@@ -458,6 +466,7 @@
   if (modeEl) modeEl.value = saved.mode ?? 'poll';
   if (timeModeEl) timeModeEl.value = saved.timeMode ?? 'manual';
   if (lookbackMinEl) lookbackMinEl.value = saved.lookbackMin ?? 60;
+  if (fetchModeEl) fetchModeEl.value = saved.fetchMode ?? 'window';
 
   function persistSettings() {
     localStorage.setItem('matrix_settings_v4_fixed', JSON.stringify({
@@ -476,10 +485,11 @@
       mode: modeEl?.value || 'poll',
       timeMode: timeModeEl?.value || 'manual',
       lookbackMin: Number(lookbackMinEl?.value || 60),
+      fetchMode: fetchModeEl?.value || 'window',
     }));
   }
 
-  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl].filter(Boolean);
+  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl, fetchModeEl].filter(Boolean);
   for (const el of settingEls) el.addEventListener('change', persistSettings);
 
   // Buttons
@@ -506,12 +516,14 @@
       const cs = Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 2)));
       setApiStatus('API: kör polling mot /MeasurementMulti' + (tm === 'latest' ? ' · Strömmande senaste' : ' · Manuell tid')
         + ` · chunk=${cs}`
+        + ` · fetch=${(fetchModeEl?.value||'window')}`
         + ' (tryck "Testa" för direktanrop)');
     }
   }
   if (modeEl) modeEl.addEventListener('change', applyMode);
   if (timeModeEl) timeModeEl.addEventListener('change', applyMode);
   if (lookbackMinEl) lookbackMinEl.addEventListener('change', applyMode);
+  if (fetchModeEl) fetchModeEl.addEventListener('change', applyMode);
 
   // Start mode
   applyMode();
@@ -619,3 +631,4 @@
   if (hudClose) hudClose.addEventListener('click', () => toggleHud(false));
 
 })();
+
