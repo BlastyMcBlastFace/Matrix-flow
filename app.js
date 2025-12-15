@@ -1,24 +1,37 @@
-/* Matrix Live Data Stream (v3)
-   - Polling with Bearer token (Authorization header)
-   - Adds on-screen API status + robust JSON flattening so you get "something" even for nested payloads.
-*/
+/* Matrix Live Data Stream (v4) — Käppala/aCurve API-ready
+   - GET  /Tag                (list taggar)
+   - POST /MeasurementMulti   (hämta mätdata)
+   - Authorization: Bearer <token>
+   - On-screen API-status + injects response into rain.
 
+   Controls: S (settings), F (fullscreen), Space (pause)
+*/
 (() => {
   'use strict';
 
   const canvas = document.getElementById('matrix');
   const ctx = canvas.getContext('2d', { alpha: false });
 
+  // HUD elements
   const hud = document.getElementById('hud');
   const hudClose = document.getElementById('hudClose');
-  const endpointEl = document.getElementById('endpoint');
+  const baseUrlEl = document.getElementById('baseUrl');
   const tokenEl = document.getElementById('token');
-  const modeEl = document.getElementById('mode');
   const pollMsEl = document.getElementById('pollMs');
   const charsetEl = document.getElementById('charset');
   const trailEl = document.getElementById('trail');
+  const tagsEl = document.getElementById('tags');
+  const startTimeEl = document.getElementById('startTime');
+  const endTimeEl = document.getElementById('endTime');
+  const resTypeEl = document.getElementById('resType');
+  const resNumEl = document.getElementById('resNum');
+  const tsTypeEl = document.getElementById('tsType');
+  const modeEl = document.getElementById('mode');
   const apiStatusEl = document.getElementById('apiStatus');
+  const btnLoadTags = document.getElementById('btnLoadTags');
+  const btnTestMeas = document.getElementById('btnTestMeas');
 
+  // ---- Render params ----
   const GREEN = 'rgba(72, 255, 132, 1)';
   const BG_FADE = () => Math.min(0.30, Math.max(0.02, Number(trailEl.value || 0.08)));
 
@@ -36,6 +49,7 @@
   window.addEventListener('resize', resize, { passive: true });
   resize();
 
+  // Charsets
   const DIGITS = '0123456789';
   const HEX = '0123456789ABCDEF';
   const KATAKANA = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
@@ -50,7 +64,7 @@
 
   // Data buffer
   const dataQueue = [];
-  const MAX_QUEUE = 6000;
+  const MAX_QUEUE = 9000;
 
   function enqueueToken(tok) {
     if (tok == null) return;
@@ -61,13 +75,9 @@
     }
   }
 
-  // Robust payload-to-tokens:
-  // - If it's nested, we recursively walk and emit a compact stream of key=value pairs & numbers.
-  // - This makes it much more likely you see your API's data without custom mapping.
   function flattenToTokens(value, path = '', out = [], depth = 0) {
-    if (depth > 6) return out; // avoid runaway
+    if (depth > 7) return out;
     if (value == null) return out;
-
     const t = typeof value;
 
     if (t === 'string' || t === 'number' || t === 'boolean') {
@@ -78,14 +88,12 @@
     }
 
     if (Array.isArray(value)) {
-      // If it's an array of primitives, emit them
       const primitive = value.every(v => v == null || ['string','number','boolean'].includes(typeof v));
       if (primitive) {
         for (const v of value) out.push(`${v} `);
         return out;
       }
-      // Otherwise walk a limited number of items
-      for (let i = 0; i < Math.min(30, value.length); i++) {
+      for (let i = 0; i < Math.min(40, value.length); i++) {
         flattenToTokens(value[i], path ? `${path}[${i}]` : `[${i}]`, out, depth + 1);
       }
       return out;
@@ -93,14 +101,13 @@
 
     if (t === 'object') {
       const entries = Object.entries(value);
-      for (let i = 0; i < Math.min(40, entries.length); i++) {
+      for (let i = 0; i < Math.min(60, entries.length); i++) {
         const [k, v] = entries[i];
         const p = path ? `${path}.${k}` : k;
         flattenToTokens(v, p, out, depth + 1);
       }
       return out;
     }
-
     return out;
   }
 
@@ -108,14 +115,13 @@
     try {
       const toks = flattenToTokens(payload);
       if (toks.length === 0) return;
-      // Join into manageable chunks so we don't drown the queue
       const joined = toks.join('');
-      enqueueToken(joined.slice(0, 1200));
+      enqueueToken(joined.slice(0, 1600));
     } catch {}
   }
 
   function takeTokenOrRandom(charset) {
-    const useLive = dataQueue.length > 0 && Math.random() < 0.60;
+    const useLive = dataQueue.length > 0 && Math.random() < 0.62;
     if (useLive) return dataQueue.shift();
     return charset[(Math.random() * charset.length) | 0];
   }
@@ -124,11 +130,235 @@
     apiStatusEl.textContent = text;
   }
 
-  // Feeds
-  let stopFeed = null;
-  function stopCurrentFeed() { if (typeof stopFeed === 'function') stopFeed(); stopFeed = null; }
+  // ---- API helpers ----
+  function cleanBaseUrl() {
+    let u = (baseUrlEl.value || '').trim();
+    if (!u) return '';
+    // Ensure trailing slash
+    if (!u.endsWith('/')) u += '/';
+    return u;
+  }
+
+  function authHeaders() {
+    const token = (tokenEl.value || '').trim();
+    const headers = {
+      'Accept': 'application/json, text/plain;q=0.9, */*;q=0.8',
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  }
+
+  function parseMaybeJson(text) {
+    const s = String(text || '').trim();
+    if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+      try { return JSON.parse(s); } catch { return text; }
+    }
+    return text;
+  }
+
+  function buildMeasurementBody() {
+    const rawTags = (tagsEl.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+    const startTime = (startTimeEl.value || '').trim();
+    const endTime = (endTimeEl.value || '').trim();
+
+    return {
+      TagName: rawTags,
+      StartTime: startTime,
+      EndTime: endTime,
+      ResolutionType: (resTypeEl.value || 'h').trim(),
+      ResolutionNumber: String(resNumEl.value || '1'),
+      ReturnTimeStampType: (tsTypeEl.value || 'LOCAL').trim(),
+    };
+  }
+
+  async function fetchTags() {
+    const base = cleanBaseUrl();
+    if (!base) { setApiStatus('API: sätt API-bas först'); return; }
+    const url = base + 'Tag';
+
+    const started = performance.now();
+    try {
+      const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+      const ms = Math.round(performance.now() - started);
+
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      let payload = ct.includes('application/json') ? await res.json() : parseMaybeJson(await res.text());
+
+      if (!res.ok) {
+        setApiStatus(`API: /Tag HTTP ${res.status} (${ms}ms)`);
+        normalizeApiPayload(payload);
+        return;
+      }
+
+      // Best-effort extraction of tag names
+      const tags = [];
+      if (Array.isArray(payload)) {
+        for (const item of payload.slice(0, 200)) {
+          if (typeof item === 'string') tags.push(item);
+          else if (item && typeof item === 'object') {
+            const name = item.TagName ?? item.Name ?? item.tagName ?? item.tag ?? item.id ?? null;
+            if (name != null) tags.push(String(name));
+          }
+        }
+      }
+
+      if (tags.length) {
+        // Put first 50 in textarea (do not overwrite if user already has values)
+        if (!tagsEl.value.trim()) tagsEl.value = tags.slice(0, 50).join('\n');
+        setApiStatus(`API: /Tag OK (${ms}ms) · hittade ${tags.length} taggar (visar upp till 50)`);
+      } else {
+        setApiStatus(`API: /Tag OK (${ms}ms) · kunde inte tolka payload (kolla Console)`);
+      }
+
+      normalizeApiPayload(payload);
+      persistSettings();
+    } catch (e) {
+      setApiStatus('API: /Tag FEL (CORS/Nät) — öppna DevTools → Console/Network');
+      enqueueToken('NET… ');
+    }
+  }
+
+  async function fetchMeasurementOnce() {
+    const base = cleanBaseUrl();
+    if (!base) { setApiStatus('API: sätt API-bas först'); return false; }
+    const url = base + 'MeasurementMulti';
+
+    const body = buildMeasurementBody();
+    if (!Array.isArray(body.TagName) || body.TagName.length === 0) {
+      setApiStatus('API: lägg in minst 1 TagName (en per rad)');
+      return false;
+    }
+    if (!body.StartTime || !body.EndTime) {
+      setApiStatus('API: fyll i StartTime och EndTime (YYYY-MM-DD HH:mm)');
+      return false;
+    }
+
+    const started = performance.now();
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          ...authHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      const ms = Math.round(performance.now() - started);
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      let payload = ct.includes('application/json') ? await res.json() : parseMaybeJson(await res.text());
+
+      if (!res.ok) {
+        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) — token/behörighet?`);
+        normalizeApiPayload(payload);
+        return false;
+      }
+
+      // Inject response
+      normalizeApiPayload(payload);
+
+      // Try show something meaningful: count of values if common shapes are used
+      let hint = '';
+      try {
+        if (payload && typeof payload === 'object') {
+          // common shapes: { data: [...] } or { Measurements: [...] } etc.
+          const arr = payload.data ?? payload.values ?? payload.items ?? payload.Measurements ?? payload.measurements;
+          if (Array.isArray(arr)) hint = ` · values=${arr.length}`;
+        }
+      } catch {}
+
+      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length}${hint}`);
+      persistSettings();
+      return true;
+    } catch (e) {
+      setApiStatus('API: /MeasurementMulti FEL (CORS/Nät) — öppna DevTools → Console/Network');
+      enqueueToken('NET… ');
+      return false;
+    }
+  }
+
+  // Auto polling loop for MeasurementMulti
+  let stopPoll = null;
+  function startPolling() {
+    stopPolling();
+    let alive = true;
+
+    const loop = async () => {
+      if (!alive) return;
+      await fetchMeasurementOnce();
+      const ms = Math.max(200, Number(pollMsEl.value || 3000));
+      setTimeout(loop, ms);
+    };
+    loop();
+
+    stopPoll = () => { alive = false; };
+  }
+  function stopPolling() {
+    if (typeof stopPoll === 'function') stopPoll();
+    stopPoll = null;
+  }
+
+  // ---- Settings persistence ----
+  const saved = (() => { try { return JSON.parse(localStorage.getItem('matrix_settings_v4') || '{}'); } catch { return {}; } })();
+  baseUrlEl.value = saved.baseUrl ?? 'https://acurve.kappala.se:50001/api/v1/';
+  tokenEl.value = saved.token ?? '';
+  pollMsEl.value = saved.pollMs ?? 3000;
+  charsetEl.value = saved.charset ?? 'matrix';
+  trailEl.value = saved.trail ?? 0.08;
+  tagsEl.value = saved.tags ?? '';
+  startTimeEl.value = saved.startTime ?? '2023-01-05 00:00';
+  endTimeEl.value = saved.endTime ?? '2023-01-05 12:00';
+  resTypeEl.value = saved.resType ?? 'h';
+  resNumEl.value = saved.resNum ?? 1;
+  tsTypeEl.value = saved.tsType ?? 'LOCAL';
+  modeEl.value = saved.mode ?? 'poll';
+
+  function persistSettings() {
+    localStorage.setItem('matrix_settings_v4', JSON.stringify({
+      baseUrl: baseUrlEl.value,
+      token: tokenEl.value,
+      pollMs: Number(pollMsEl.value),
+      charset: charsetEl.value,
+      trail: Number(trailEl.value),
+      tags: tagsEl.value,
+      startTime: startTimeEl.value,
+      endTime: endTimeEl.value,
+      resType: resTypeEl.value,
+      resNum: Number(resNumEl.value),
+      tsType: tsTypeEl.value,
+      mode: modeEl.value,
+    }));
+  }
+
+  for (const el of [baseUrlEl, tokenEl, pollMsEl, charsetEl, trailEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl]) {
+    el.addEventListener('change', persistSettings);
+  }
+
+  // Buttons
+  btnLoadTags.addEventListener('click', fetchTags);
+  btnTestMeas.addEventListener('click', fetchMeasurementOnce);
+
+  // Mode behavior
+  function applyMode() {
+    const mode = (modeEl.value || 'poll').toLowerCase();
+    if (mode === 'demo') {
+      stopPolling();
+      startDemoFeed();
+      return;
+    }
+    // default poll: measuremulti loop
+    stopDemo();
+    startPolling();
+  }
+  modeEl.addEventListener('change', applyMode);
+
+  // ---- Demo feed fallback ----
+  let stopDemoFn = null;
+  function stopDemo() { if (typeof stopDemoFn === 'function') stopDemoFn(); stopDemoFn = null; }
 
   function startDemoFeed() {
+    stopDemo();
     setApiStatus('API: demo (lokal data)');
     const fields = ['FLOW','NH4','NO3','PO4','COD','DO','TEMP','kWh','PUMP','VALVE','SENSOR','ALARM','OK','WARN','ID','TS'];
     const t0 = performance.now();
@@ -141,135 +371,16 @@
       const pick = fields[(Math.random() * fields.length) | 0];
       enqueueToken(`${pick} ${flow} ${nh4} ${temp} ${kwh} `);
     }, 250);
-    return () => clearInterval(id);
+    stopDemoFn = () => clearInterval(id);
   }
 
-  function buildAuthHeaders() {
-    const token = (tokenEl.value || '').trim();
-    const headers = {
-      'Accept': 'application/json, text/plain;q=0.9, */*;q=0.8',
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return headers;
-  }
+  // Kickoff
+  setApiStatus('API: redo — tryck "Testa /MeasurementMulti" eller vänta på polling');
+  applyMode();
 
-  function startPollingFeed(endpoint, pollMs) {
-    let alive = true;
-    let okCount = 0;
-
-    async function tick() {
-      if (!alive) return;
-
-      const started = performance.now();
-      try {
-        const res = await fetch(endpoint, {
-          cache: 'no-store',
-          headers: buildAuthHeaders(),
-        });
-
-        const ms = Math.round(performance.now() - started);
-
-        if (!res.ok) {
-          setApiStatus(`API: HTTP ${res.status} (${ms}ms) — kontrollera token/behörighet`);
-        } else {
-          okCount++;
-        }
-
-        const ct = (res.headers.get('content-type') || '').toLowerCase();
-        let payload;
-        if (ct.includes('application/json')) payload = await res.json();
-        else payload = await res.text();
-
-        // If payload is text that looks like JSON, try parse
-        if (typeof payload === 'string') {
-          const s = payload.trim();
-          if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
-            try { payload = JSON.parse(s); } catch {}
-          }
-        }
-
-        normalizeApiPayload(payload);
-
-        if (res.ok) {
-          const q = dataQueue.length;
-          setApiStatus(`API: OK (${ms}ms) · injicerar data · queue=${q} · ok#=${okCount}`);
-        }
-      } catch (e) {
-        // Usually CORS/network/DNS
-        setApiStatus(`API: FEL (CORS/Nät) — öppna DevTools → Console/Network`);
-        // small marker
-        if (Math.random() < 0.30) enqueueToken('NET… ');
-      } finally {
-        setTimeout(tick, pollMs);
-      }
-    }
-
-    tick();
-    return () => { alive = false; };
-  }
-
-  function startSSEFeed(endpoint) {
-    // SSE in browser cannot send Authorization header.
-    setApiStatus('API: SSE (obs: inga Authorization-headers i webbläsaren)');
-    let es;
-    try { es = new EventSource(endpoint); } catch { return null; }
-    es.onmessage = (ev) => {
-      const raw = ev.data;
-      try { normalizeApiPayload(JSON.parse(raw)); }
-      catch { normalizeApiPayload(raw); }
-    };
-    es.onerror = () => setApiStatus('API: SSE fel — prova Polling istället');
-    return () => { try { es.close(); } catch {} };
-  }
-
-  function startFeedFromSettings() {
-    stopCurrentFeed();
-
-    const endpoint = (endpointEl.value || '').trim();
-    const mode = (modeEl.value || 'poll').toLowerCase();
-    const pollMs = Math.max(200, Number(pollMsEl.value || 1000));
-
-    if (!endpoint || mode === 'demo') { stopFeed = startDemoFeed(); return; }
-    if (mode === 'sse') {
-      const stopper = startSSEFeed(endpoint);
-      if (stopper) { stopFeed = stopper; return; }
-      // fall back to polling
-    }
-
-    stopFeed = startPollingFeed(endpoint, pollMs);
-  }
-
-  // Persist settings
-  const saved = (() => { try { return JSON.parse(localStorage.getItem('matrix_settings') || '{}'); } catch { return {}; } })();
-  endpointEl.value = saved.endpoint ?? '';
-  tokenEl.value = saved.token ?? '';
-  modeEl.value = saved.mode ?? 'poll';
-  pollMsEl.value = saved.pollMs ?? 1000;
-  charsetEl.value = saved.charset ?? 'matrix';
-  trailEl.value = saved.trail ?? 0.08;
-
-  function persistSettings() {
-    localStorage.setItem('matrix_settings', JSON.stringify({
-      endpoint: endpointEl.value,
-      token: tokenEl.value,
-      mode: modeEl.value,
-      pollMs: Number(pollMsEl.value),
-      charset: charsetEl.value,
-      trail: Number(trailEl.value),
-    }));
-  }
-
-  for (const el of [endpointEl, tokenEl, modeEl, pollMsEl, charsetEl, trailEl]) {
-    el.addEventListener('change', () => { persistSettings(); startFeedFromSettings(); });
-  }
-  hudClose.addEventListener('click', () => toggleHud(false));
-
-  startFeedFromSettings();
-
-  // Multi-layer rain
+  // ---- Multi-layer rain ----
   function makeLayer(fontPx, speedMul, densityMul, glow, alphaMul) {
     const layer = {
-      fontPx, speedMul, densityMul, glow, alphaMul,
       columns: [], stepY: fontPx * 1.05, lastW: -1,
       init() {
         const colW = fontPx * 0.62;
@@ -346,11 +457,11 @@
     }
     requestAnimationFrame(frame);
   }
-
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
   requestAnimationFrame(frame);
 
+  // ---- Controls ----
   function toggleHud(force) {
     const show = typeof force === 'boolean' ? force : hud.classList.contains('hidden');
     hud.classList.toggle('hidden', !show);
@@ -369,5 +480,7 @@
     else if (e.key === 'f' || e.key === 'F') toggleFullscreen();
     else if (e.key === 'Escape' && !hud.classList.contains('hidden')) toggleHud(false);
   });
+
+  hudClose.addEventListener('click', () => toggleHud(false));
 
 })();
