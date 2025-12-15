@@ -25,6 +25,8 @@
   const resTypeEl = document.getElementById('resType');
   const resNumEl = document.getElementById('resNum');
   const tsTypeEl = document.getElementById('tsType');
+  const timeModeEl = document.getElementById('timeMode');
+  const lookbackMinEl = document.getElementById('lookbackMin');
   const modeEl = document.getElementById('mode');
   const apiStatusEl = document.getElementById('apiStatus');
   const btnLoadTags = document.getElementById('btnLoadTags');
@@ -140,6 +142,17 @@
     return headers;
   }
 
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function formatLocalYYYYMMDDHHmm(d){
+    const y = d.getFullYear();
+    const m = pad2(d.getMonth()+1);
+    const day = pad2(d.getDate());
+    const hh = pad2(d.getHours());
+    const mm = pad2(d.getMinutes());
+    return `${y}-${m}-${day} ${hh}:${mm}`;
+  }
+
   function parseMaybeJson(text) {
     const s = String(text || '').trim();
     if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
@@ -150,10 +163,25 @@
 
   function buildMeasurementBody() {
     const rawTags = (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+
+    // Manual times (what user typed)
+    let start = (startTimeEl?.value || '').trim();
+    let end = (endTimeEl?.value || '').trim();
+
+    // Latest mode: compute a rolling window ending "now" in the format the API spec shows: YYYY-MM-DD HH:mm
+    const tm = (timeModeEl?.value || 'manual').toLowerCase();
+    if (tm === 'latest') {
+      const lookback = Math.max(1, Number(lookbackMinEl?.value || 60));
+      const now = new Date();
+      const from = new Date(now.getTime() - lookback * 60 * 1000);
+      end = formatLocalYYYYMMDDHHmm(now);
+      start = formatLocalYYYYMMDDHHmm(from);
+    }
+
     return {
       TagName: rawTags,
-      StartTime: (startTimeEl?.value || '').trim(),
-      EndTime: (endTimeEl?.value || '').trim(),
+      StartTime: start,
+      EndTime: end,
       ResolutionType: (resTypeEl?.value || 'h').trim(),
       ResolutionNumber: String(resNumEl?.value || '1'),
       ReturnTimeStampType: (tsTypeEl?.value || 'LOCAL').trim(),
@@ -232,7 +260,10 @@
       let payload = ct.includes('application/json') ? await res.json() : parseMaybeJson(await res.text());
 
       if (!res.ok) {
-        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms)`);
+        const body = buildMeasurementBody();
+        const snippet = (typeof payload === 'string') ? String(payload).slice(0, 180) : '';
+        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime}` + (snippet ? ` · ${snippet}` : ''));
+        try { console.warn('MeasurementMulti non-OK', res.status, { requestBody: body, response: payload }); } catch {}
         normalizeApiPayload(payload);
         return false;
       }
@@ -251,10 +282,6 @@
   // Poll loop
   let stopPoll = null;
   function startPolling() {
-      setInterval(() => {
-        fetchMeasurementOnce();
-      }, 1000);  // Poll every second to get the latest data.
-    } {
     stopPolling();
     let alive = true;
 
@@ -307,6 +334,8 @@
   if (resNumEl) resNumEl.value = saved.resNum ?? 1;
   if (tsTypeEl) tsTypeEl.value = saved.tsType ?? 'LOCAL';
   if (modeEl) modeEl.value = saved.mode ?? 'poll';
+  if (timeModeEl) timeModeEl.value = saved.timeMode ?? 'manual';
+  if (lookbackMinEl) lookbackMinEl.value = saved.lookbackMin ?? 60;
 
   function persistSettings() {
     localStorage.setItem('matrix_settings_v4_fixed', JSON.stringify({
@@ -322,10 +351,12 @@
       resNum: Number(resNumEl?.value || 1),
       tsType: tsTypeEl?.value || 'LOCAL',
       mode: modeEl?.value || 'poll',
+      timeMode: timeModeEl?.value || 'manual',
+      lookbackMin: Number(lookbackMinEl?.value || 60),
     }));
   }
 
-  const settingEls = [baseUrlEl, tokenEl, pollMsEl, charsetEl, trailEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl].filter(Boolean);
+  const settingEls = [baseUrlEl, tokenEl, pollMsEl, charsetEl, trailEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl].filter(Boolean);
   for (const el of settingEls) el.addEventListener('change', persistSettings);
 
   // Buttons
@@ -341,10 +372,13 @@
     } else {
       stopDemo();
       startPolling();
-      setApiStatus('API: kör polling mot /MeasurementMulti (tryck "Testa" för direktanrop)');
+      const tm = (timeModeEl?.value || 'manual').toLowerCase();
+      setApiStatus('API: kör polling mot /MeasurementMulti' + (tm === 'latest' ? ' · Strömmande senaste (rullande fönster)' : ' · Manuell tid') + ' (tryck "Testa" för direktanrop)');
     }
   }
   if (modeEl) modeEl.addEventListener('change', applyMode);
+  if (timeModeEl) timeModeEl.addEventListener('change', applyMode);
+  if (lookbackMinEl) lookbackMinEl.addEventListener('change', applyMode);
 
   // Start mode
   applyMode();

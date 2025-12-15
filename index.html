@@ -99,6 +99,22 @@
       </label>
     </div>
 
+
+    <div class="hud__grid">
+      <label class="hud__label">
+        Senaste-läge
+        <select id="timeMode" class="hud__select">
+          <option value="manual" selected>Manuell (använd fälten Start/End)</option>
+          <option value="latest">Strömmande: senaste värdet (rullande fönster)</option>
+        </select>
+      </label>
+
+      <label class="hud__label">
+        Fönster bakåt (minuter)
+        <input id="lookbackMin" class="hud__input" type="number" min="1" step="1" value="60" />
+      </label>
+    </div>
+
     <div class="hud__actions">
       <button id="btnLoadTags" class="hud__action" type="button">Hämta /Tag</button>
       <button id="btnTestMeas" class="hud__action" type="button">Testa /MeasurementMulti</button>

@@ -20,6 +20,8 @@ Då blockeras anrop från webbläsaren och du behöver proxy eller CORS-headers 
 Den här versionen drar alltid tecken från queue när den innehåller data (maximal "meningsfull" stream).
 
 
-## Uppdateringar:
-- Tider skickas nu i ISO 8601-format (UTC) för att undvika 403-felet.
-- Polling sker varje sekund för att få de senaste aktuella värdena.
+## Strömmande senaste värdet
+I inställningarna finns **Senaste-läge**. När det är valt räknas StartTime/EndTime automatiskt som ett rullande fönster bakåt från 'nu' i formatet **YYYY-MM-DD HH:mm** (som API-specen).
+
+## 403 vid ändring av tid
+Om du får 403 när du väljer vissa tider är det ofta att intervallet är otillåtet (t.ex. EndTime i framtiden, för stort spann, eller behörighet saknas för historik). Den här versionen visar även Start/End som faktiskt skickas samt en kort snutt av feltexten i statusraden.
