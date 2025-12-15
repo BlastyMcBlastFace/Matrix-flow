@@ -113,8 +113,7 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 - Ny toggle: **Lås första tecknet från data**.
 
 
-## v6.5 — head visar hela talet
-- Numeriska värden från API:t läggs i en separat **valueQueue**.
-- Varje kolumn får en **headToken** (t.ex. `12.34`) som är låst under hela fallet.
-- Spåret bakom är fortsatt slumptecken.
-- Debug overlay visar både QUEUE(values) och senaste INJECT.
+## v6.6 — head = hela talet (vertikalt)
+- API-värden samlas som numeriska tokens (två decimaler) i **valueQueue**.
+- Varje kolumn får en **headToken** (t.ex. 12.34) som ritas **vertikalt** i kolumnen och är låst tills kolumnen resetas.
+- Debug overlay visar QUEUE(values) och NEXT_VALUES.

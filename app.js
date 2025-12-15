@@ -83,14 +83,18 @@
   }
 
   // Data buffer
-  const dataQueue = []; // legacy char-queue (kept, but not used for heads)
-  const valueQueue = []; // numeric tokens for heads
-  const MAX_VALUE_QUEUE = 2000;
+  const dataQueue = [];
+  // Numeric value tokens for column heads
+  const valueQueue = [];
+  const MAX_VALUE_QUEUE = 5000;
   function enqueueValueToken(tok){
     const s = String(tok ?? '').trim();
     if (!s) return;
     valueQueue.push(s);
     if (valueQueue.length > MAX_VALUE_QUEUE) valueQueue.splice(0, valueQueue.length - MAX_VALUE_QUEUE);
+  }
+  function nextHeadToken(){
+    return valueQueue.length ? valueQueue.shift() : '';
   }
 
   // For streaming mode: only request data since last successful fetch
@@ -112,6 +116,7 @@
     const q = (typeof dataQueue !== 'undefined') ? dataQueue.length : 0;
     debugOverlayEl.textContent =
       `QUEUE(chars): ${q} | QUEUE(values): ${valueQueue.length}\n` +
+      (valueQueue.length ? `NEXT_VALUES: ${valueQueue.slice(0, 8).join(' , ')}\n` : '') +
       (lastRequestInfo ? `REQ: ${lastRequestInfo}\n` : '') +
       (lastResponseInfo ? `RES: ${lastResponseInfo}\n` : '') +
       `INJECT: ${lastInjected}`;
@@ -196,6 +201,33 @@
     }
     return String(v);
   }
+
+  function collectNumericValues(node, out, depth=0){
+    if (depth > 6) return;
+    if (node == null) return;
+    if (typeof node === 'number') { out.push(node); return; }
+    if (typeof node === 'string') {
+      const s = node.trim().replace(',', '.');
+      if (/^[+-]?(\d+\.?\d*|\d*\.?\d+)([eE][+-]?\d+)?$/.test(s)) {
+        const n = Number(s);
+        if (Number.isFinite(n)) out.push(n);
+      }
+      return;
+    }
+    if (Array.isArray(node)) {
+      // take last few to keep "latest"
+      const start = Math.max(0, node.length - 3);
+      for (let i = start; i < node.length; i++) collectNumericValues(node[i], out, depth+1);
+      return;
+    }
+    if (typeof node === 'object') {
+      // common fields
+      for (const key of ['Value','value','Val','val','Y','y']) {
+        if (key in node) { collectNumericValues(node[key], out, depth+1); return; }
+      }
+      for (const v of Object.values(node)) collectNumericValues(v, out, depth+1);
+    }
+  }
   function extractValuePoint(x){
     if (x == null) return null;
     if (typeof x === 'number' || typeof x === 'string' || typeof x === 'boolean') return x;
@@ -215,7 +247,7 @@
   }
   function extractValueStream(payload){
     try {
-      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return '';
       const vals = [];
       for (const v of Object.values(payload)) {
         const val = extractValuePoint(v);
@@ -224,10 +256,9 @@
         if (!outVal) continue;
         vals.push(outVal);
       }
-      return vals;
-    } catch { return []; }
+      return vals.join('   ');
+    } catch { return ''; }
   }
-
   function extractCompactStream(payload){
     try {
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return '';
@@ -245,28 +276,29 @@
   }
   function normalizeApiPayload(payload) {
     try {
-      const verbose = extractCompactStream(payload);
-      const valuesArr = extractValueStream(payload);
-      if ((valuesArr && valuesArr.length) || verbose) {
-        // Enqueue numeric values as separate tokens for column heads
-        if (valuesArr && valuesArr.length) {
-          for (const v of valuesArr) enqueueValueToken(v);
-        }
-        // For the visual rain injection (chars), we still inject a compact string so something flows
-        const injectStr = (valuesArr && valuesArr.length) ? valuesArr.join('   ') : verbose;
+      // Collect numeric values from any payload shape (latest values)
+      const nums = [];
+      collectNumericValues(payload, nums);
+      const formatted = nums
+        .filter(n => Number.isFinite(n))
+        .slice(-20)
+        .map(n => n.toFixed(2));
+
+      if (formatted.length) {
+        for (const v of formatted) enqueueValueToken(v);
+      }
+
+      // Keep the rain moving with a readable injected string as well
+      const verbose = extractCompactStream(payload) || '';
+      const injectStr = formatted.length ? formatted.join('   ') : verbose;
+
+      if (injectStr) {
         lastInjected = injectStr;
         if (verbose && verbose !== injectStr) lastInjected = `${injectStr}\n[verbose] ${verbose}`;
         const rep = repeatFactor();
         for (let i = 0; i < rep; i++) enqueueToken(' ' + injectStr + '   ');
         updateDebug();
-        return;
       }
-      const toks = flattenToTokens(payload);
-      if (toks.length === 0) return;
-      const flat = toks.join('').slice(0, 1600);
-      lastInjected = flat;
-      enqueueToken(flat);
-      updateDebug();
     } catch {}
   }
   function takeFromQueue() {
@@ -282,13 +314,6 @@
   function randomDigit(){
     return String((Math.random() * 10) | 0);
   }
-  function nextHeadToken(){
-    // Prefer numeric value tokens from API
-    if (valueQueue.length > 0) return valueQueue.shift();
-    // Fallback: readable random two-decimal number
-    return (Math.random() * 100).toFixed(2);
-  }
-
   function nextHeadChar(charset){
     // Prefer data chars, but fall back to digits so heads are readable
     const c = takeFromQueue();
@@ -766,7 +791,8 @@
           speed: (0.55 + Math.random() * 1.25) * speedMul,
           burst: 12 + ((Math.random() * 28) | 0),
           burstDecay: 0.0,
-          headToken: null,
+          headToken: '',
+          headChars: null,
         }));
         this.lastW = W;
       },
@@ -809,7 +835,8 @@
             c.speed = (0.55 + Math.random() * 1.25) * speedMul;
             c.burst = 12 + ((Math.random() * 28) | 0);
             c.burstDecay = 0.0;
-            c.headToken = headLockEl?.checked ? nextHeadToken() : nextHeadToken();
+            c.headToken = '';
+            c.headChars = null;
           }
         }
         ctx.shadowBlur = 0;
