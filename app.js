@@ -809,6 +809,12 @@
           const c = this.columns[i];
           const x = Math.floor(i * (fontPx * 0.62));
           const yPx = c.y * this.stepY;
+          // Assign head token only before the column enters the screen (so it stays stable for the whole fall)
+          if (!c.headToken && c.y < 0 && valueQueue.length > 0) {
+            c.headToken = nextHeadToken();
+            c.headChars = c.headToken ? String(c.headToken).split('') : null;
+          }
+
 
           const tail = Math.max(6, Math.floor(c.burst - c.burstDecay));
           c.burstDecay += 0.015 * c.speed * speedScale();
@@ -824,24 +830,22 @@
             ctx.fillText(ch, x, y);
           }
 
-          // Stable head token (whole value), drawn last so it doesn't flicker
-          if (!c.headToken) {
-            const tok = (headLockEl?.checked) ? nextHeadToken() : '';
-            c.headToken = tok || (Math.random() * 100).toFixed(2);
-            c.headChars = String(c.headToken).split('');
+                    // Head token: only draw if assigned from API queue
+          if (c.headToken) {
+// Stable head token (whole value), drawn last so it doesn't flicker
+            const chars = c.headChars || String(c.headToken).split('');
+            const L = Math.min(chars.length, 10);
+            for (let i2 = 0; i2 < L; i2++) {
+              const y2 = yPx + i2 * this.stepY;
+              if (y2 < -this.stepY) continue;
+              if (y2 > H + this.stepY) break;
+              const aH = (0.98 - i2 * 0.06) * alphaMul;
+              ctx.fillStyle = `rgba(180, 255, 210, ${Math.max(0.30, aH)})`;
+              ctx.fillText(chars[i2], x, y2);
+            }
+             
           }
-          const chars = c.headChars || String(c.headToken).split('');
-          const L = Math.min(chars.length, 10);
-          for (let i2 = 0; i2 < L; i2++) {
-            const y2 = yPx - i2 * this.stepY;
-            if (y2 < -this.stepY) continue;
-            if (y2 > H + this.stepY) break;
-            const aH = (0.98 - i2 * 0.06) * alphaMul;
-            ctx.fillStyle = `rgba(180, 255, 210, ${Math.max(0.30, aH)})`;
-            ctx.fillText(chars[i2], x, y2);
-          }
-
-          c.y += c.speed * speedScale();
+c.y += c.speed * speedScale();
           if (yPx > H + 200) {
             c.y = (Math.random() * -90) | 0;
             c.speed = (0.55 + Math.random() * 1.25) * speedMul;

@@ -117,3 +117,9 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 - API-värden samlas som numeriska tokens (två decimaler) i **valueQueue**.
 - Varje kolumn får en **headToken** (t.ex. 12.34) som ritas **vertikalt** i kolumnen och är låst tills kolumnen resetas.
 - Debug overlay visar QUEUE(values) och NEXT_VALUES.
+
+
+## v6.8 — headtokens endast från API + läsbart uppifrån och ner
+- **Ingen** slump-fallback för headtokens: de ritas bara om de finns i API valueQueue.
+- Head-token skrivs vertikalt så att talet kan läsas **uppifrån och ner**.
+- Head-token tilldelas endast när kolumnen fortfarande är ovanför skärmen (så den inte kan bytas mitt i fallet).
