@@ -276,25 +276,25 @@
   }
   function normalizeApiPayload(payload) {
     try {
-      // Collect numeric values from any payload shape (latest values)
       const nums = [];
       collectNumericValues(payload, nums);
+
+      // Format with 2 decimals and push newest last
       const formatted = nums
         .filter(n => Number.isFinite(n))
-        .slice(-20)
+        .slice(-30)
         .map(n => n.toFixed(2));
 
-      if (formatted.length) {
-        for (const v of formatted) enqueueValueToken(v);
-      }
+      for (const v of formatted) enqueueValueToken(v);
 
-      // Keep the rain moving with a readable injected string as well
-      const verbose = extractCompactStream(payload) || '';
+      // Inject something readable into the character rain as well
+      const verbose = (typeof extractCompactStream === 'function') ? (extractCompactStream(payload) || '') : '';
       const injectStr = formatted.length ? formatted.join('   ') : verbose;
 
       if (injectStr) {
         lastInjected = injectStr;
-        if (verbose && verbose !== injectStr) lastInjected = `${injectStr}\n[verbose] ${verbose}`;
+        if (verbose && verbose !== injectStr) lastInjected = `${injectStr}
+[verbose] ${verbose}`;
         const rep = repeatFactor();
         for (let i = 0; i < rep; i++) enqueueToken(' ' + injectStr + '   ');
         updateDebug();
@@ -813,20 +813,32 @@
           const tail = Math.max(6, Math.floor(c.burst - c.burstDecay));
           c.burstDecay += 0.015 * c.speed * speedScale();
 
-          for (let t = 0; t < tail; t++) {
+          for (let t = 1; t < tail; t++) {
             const y = yPx - t * this.stepY;
             if (y < -this.stepY) continue;
             if (y > H + this.stepY) break;
 
-            const isHead = (t === 0);
-            const a = (isHead ? 0.98 : 0.30) * alphaMul * (1 - t / tail);
-            ctx.fillStyle = isHead ? `rgba(180, 255, 210, ${a})` : `rgba(72, 255, 132, ${a})`;
-
-            const ch = (t < 2)
-              ? takeTokenOrRandom(cs)
-              : (Math.random() < 0.08 ? takeTokenOrRandom(cs) : takeTokenOrRandom(cs));
-
+            const a = 0.30 * alphaMul * (1 - t / tail);
+            ctx.fillStyle = `rgba(72, 255, 132, ${a})`;
+            const ch = takeTokenOrRandom(cs);
             ctx.fillText(ch, x, y);
+          }
+
+          // Stable head token (whole value), drawn last so it doesn't flicker
+          if (!c.headToken) {
+            const tok = (headLockEl?.checked) ? nextHeadToken() : '';
+            c.headToken = tok || (Math.random() * 100).toFixed(2);
+            c.headChars = String(c.headToken).split('');
+          }
+          const chars = c.headChars || String(c.headToken).split('');
+          const L = Math.min(chars.length, 10);
+          for (let i2 = 0; i2 < L; i2++) {
+            const y2 = yPx - i2 * this.stepY;
+            if (y2 < -this.stepY) continue;
+            if (y2 > H + this.stepY) break;
+            const aH = (0.98 - i2 * 0.06) * alphaMul;
+            ctx.fillStyle = `rgba(180, 255, 210, ${Math.max(0.30, aH)})`;
+            ctx.fillText(chars[i2], x, y2);
           }
 
           c.y += c.speed * speedScale();
@@ -835,6 +847,8 @@
             c.speed = (0.55 + Math.random() * 1.25) * speedMul;
             c.burst = 12 + ((Math.random() * 28) | 0);
             c.burstDecay = 0.0;
+            c.headToken = '';
+            c.headChars = null;
             c.headToken = '';
             c.headChars = null;
           }
