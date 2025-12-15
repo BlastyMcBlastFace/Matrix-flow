@@ -711,6 +711,7 @@
           speed: (0.55 + Math.random() * 1.25) * speedMul,
           burst: 12 + ((Math.random() * 28) | 0),
           burstDecay: 0.0,
+          headChar: null,
         }));
         this.lastW = W;
       },
@@ -727,6 +728,7 @@
           const c = this.columns[i];
           const x = Math.floor(i * (fontPx * 0.62));
           const yPx = c.y * this.stepY;
+          if (!c.headChar) c.headChar = takeTokenOrRandom(cs);
 
           const tail = Math.max(6, Math.floor(c.burst - c.burstDecay));
           c.burstDecay += 0.015 * c.speed * speedScale();
@@ -740,9 +742,11 @@
             const a = (isHead ? 0.98 : 0.30) * alphaMul * (1 - t / tail);
             ctx.fillStyle = isHead ? `rgba(180, 255, 210, ${a})` : `rgba(72, 255, 132, ${a})`;
 
-            const ch = (t < 2)
-              ? takeTokenOrRandom(cs)
-              : (Math.random() < 0.08 ? takeTokenOrRandom(cs) : takeTokenOrRandom(cs));
+            const ch = isHead
+              ? c.headChar
+              : (t < 2)
+                ? takeTokenOrRandom(cs)
+                : (Math.random() < 0.08 ? takeTokenOrRandom(cs) : takeTokenOrRandom(cs));
 
             ctx.fillText(ch, x, y);
           }
