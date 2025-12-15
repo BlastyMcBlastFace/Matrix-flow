@@ -95,3 +95,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 
 ## v6.1 — två decimaler
 - Numeriska värden i datastreamen formateras som **xx.xx** (två decimaler), även om API:t returnerar heltal eller numeriska strängar.
+
+
+## v6.2 — debug overlay + bättre visning av decimaler
+- Checkbox **Visa debug overlay** visar senaste injicerade sträng (INJECT) + request/response + queue.
+- Queue-repeat upprepas nu per **hela injicerade strängen** så att `12.34` syns som `12.34`.

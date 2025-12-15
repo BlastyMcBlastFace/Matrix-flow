@@ -9,6 +9,8 @@
 <body>
   <canvas id="matrix"></canvas>
 
+  <div id="debugOverlay" class="debug hidden" aria-live="polite"></div>
+
   <!-- Settings HUD (toggle with S) -->
   <div id="hud" class="hud hidden" role="dialog" aria-label="Inställningar">
     <div class="hud__row">
@@ -147,6 +149,11 @@
     </div>
 
     <div class="hud__help">
+      <label class="hud__hint" style="display:flex;align-items:center;gap:10px;">
+        <input id="showDebug" type="checkbox" />
+        Visa debug overlay
+      </label>
+
       <div id="apiStatus" class="hud__status">API: (ej testad ännu)</div>
       <div class="hud__hint"><kbd>S</kbd> inställningar · <kbd>F</kbd> fullscreen · <kbd>Space</kbd> pausa</div>
       <div class="hud__hint"><b>Obs:</b> Om du kör från GitHub Pages kan CORS blockera anropet — då behövs proxy.</div>
