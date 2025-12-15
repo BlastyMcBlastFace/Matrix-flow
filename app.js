@@ -153,6 +153,20 @@
     const parts = s.split(/\\|\/|\./).filter(Boolean);
     return parts.length ? parts[parts.length-1] : s;
   }
+  function formatNumeric2(v){
+    // Force 2 decimals for numeric-looking values
+    if (v == null) return '';
+    if (typeof v === 'number') return Number.isFinite(v) ? v.toFixed(2) : String(v);
+    if (typeof v === 'string') {
+      const s = v.trim().replace(',', '.');
+      if (/^[+-]?(\d+\.?\d*|\d*\.?\d+)([eE][+-]?\d+)?$/.test(s)) {
+        const n = Number(s);
+        return Number.isFinite(n) ? n.toFixed(2) : v;
+      }
+      return v;
+    }
+    return String(v);
+  }
   function extractValuePoint(x){
     if (x == null) return null;
     if (typeof x === 'number' || typeof x === 'string' || typeof x === 'boolean') return x;
@@ -179,7 +193,8 @@
         if (val == null) continue;
         const tag = shortTagName(k);
         // keep it mostly numeric-looking
-        parts.push(`${tag}:${val}`);
+        const outVal = formatNumeric2(val);
+        parts.push(`${tag}:${outVal}`);
       }
       return parts.join(' | ');
     } catch { return ''; }

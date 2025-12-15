@@ -91,3 +91,7 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 - Nytt: **Hastighet** (0.2–1.5) för att göra regnet långsammare.
 - Nytt: **Queue-repeat** (1–10): varje queue-tecken visas flera gånger så datan inte "bränns upp" på en frame.
 - För aCurve-svar av typen `{tag:[...]}` extraheras nu kompakt `TAG:VALUE | TAG:VALUE` istället för att platta ut hela JSON.
+
+
+## v6.1 — två decimaler
+- Numeriska värden i datastreamen formateras som **xx.xx** (två decimaler), även om API:t returnerar heltal eller numeriska strängar.
