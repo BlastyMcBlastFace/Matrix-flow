@@ -163,3 +163,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## v6.11.5b — fler strömmar kan visa API-head (återanvändning via pool)
 - Tar head först från queue, annars återanvänder round-robin från poolen (samma API-data kan synas i flera strömmar).
 - Fixar dubbla funktionsdefinitioner som kunde krascha sidan.
+
+
+## v6.11.6 — hover fungerar även vid paus
+- `requestAnimationFrame(frame)` fortsätter även när sidan är pausad.
+- Hover-regioner behålls när pausad (så tooltip kan träffa samma headtokens).

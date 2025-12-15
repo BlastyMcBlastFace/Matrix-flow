@@ -986,12 +986,13 @@ c.y += c.speed * speedScale();
 
   let paused = false;
   function frame() {
-    hoverRegions.length = 0; // rebuild regions each frame
+    if (!paused) hoverRegions.length = 0; // rebuild regions when animating; keep last when paused
     if (!paused) {
       ctx.fillStyle = `rgba(0, 0, 0, ${BG_FADE()})`;
       ctx.fillRect(0, 0, W, H);
       for (const L of layers) L.draw();
     }
+        // Even when paused, allow hover tooltips
     hitTestHover();
     requestAnimationFrame(frame);
   }
