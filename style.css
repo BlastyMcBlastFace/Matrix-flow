@@ -1,0 +1,110 @@
+/* Fullscreen Matrix look */
+:root{
+  --bg: #02040a;
+  --hud-bg: rgba(2,4,10,0.78);
+  --hud-border: rgba(72, 255, 132, 0.18);
+  --hud-text: rgba(220, 255, 235, 0.92);
+  --hud-muted: rgba(220, 255, 235, 0.70);
+  --hud-accent: rgba(72, 255, 132, 0.95);
+}
+
+*{ box-sizing: border-box; }
+html, body { height: 100%; }
+body{
+  margin: 0;
+  overflow: hidden;
+  background: radial-gradient(1200px 900px at 50% 30%, #061018 0%, var(--bg) 55%, #010207 100%);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+}
+
+/* canvas fills viewport */
+#matrix{
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+/* HUD */
+.hud{
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 14px 14px 12px;
+  border-radius: 14px;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55);
+  color: var(--hud-text);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.hidden{ display:none; }
+
+.hud__row{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.hud__title{
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.hud__btn{
+  appearance: none;
+  border: 1px solid rgba(72,255,132,0.25);
+  background: rgba(0,0,0,0.25);
+  color: var(--hud-text);
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  font-size: 20px;
+  line-height: 28px;
+  cursor: pointer;
+}
+.hud__btn:hover{ border-color: rgba(72,255,132,0.5); }
+
+.hud__label{
+  display:block;
+  font-size: 12px;
+  color: var(--hud-muted);
+  margin: 10px 0;
+}
+.hud__input, .hud__select{
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(72,255,132,0.22);
+  background: rgba(0,0,0,0.35);
+  color: var(--hud-text);
+  outline: none;
+}
+.hud__input:focus, .hud__select:focus{
+  border-color: rgba(72,255,132,0.55);
+  box-shadow: 0 0 0 3px rgba(72,255,132,0.10);
+}
+
+.hud__grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 10px;
+}
+
+.hud__help{
+  margin-top: 10px;
+  color: var(--hud-muted);
+  font-size: 12px;
+}
+kbd{
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(72,255,132,0.22);
+  background: rgba(0,0,0,0.35);
+  color: var(--hud-text);
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Matrix Live Data Stream</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="matrix"></canvas>
+
+  <!-- Minimal overlay (toggle with S) -->
+  <div id="hud" class="hud hidden" role="dialog" aria-label="Inställningar">
+    <div class="hud__row">
+      <div class="hud__title">Matrix stream</div>
+      <button id="hudClose" class="hud__btn" type="button" title="Stäng (S)">×</button>
+    </div>
+
+    <label class="hud__label">
+      API-endpoint (tomt = demo)
+      <input id="endpoint" class="hud__input" placeholder="https://…/api/stream" />
+    </label>
+
+    <div class="hud__grid">
+      <label class="hud__label">
+        Läsmetod
+        <select id="mode" class="hud__select">
+          <option value="auto">Auto (SSE om möjligt)</option>
+          <option value="sse">SSE (EventSource)</option>
+          <option value="poll">Polling (fetch)</option>
+          <option value="demo">Demo (lokal data)</option>
+        </select>
+      </label>
+
+      <label class="hud__label">
+        Poll-intervall (ms)
+        <input id="pollMs" class="hud__input" type="number" min="200" step="100" value="1000" />
+      </label>
+
+      <label class="hud__label">
+        Teckenuppsättning
+        <select id="charset" class="hud__select">
+          <option value="digits">Siffror (0–9)</option>
+          <option value="matrix">Matrix (katakana + siffror)</option>
+          <option value="hex">Hex (0–9, A–F)</option>
+        </select>
+      </label>
+
+      <label class="hud__label">
+        Intensitet (spår)
+        <input id="trail" class="hud__input" type="number" min="0.02" max="0.30" step="0.01" value="0.08" />
+      </label>
+    </div>
+
+    <div class="hud__help">
+      <kbd>S</kbd> inställningar · <kbd>F</kbd> fullscreen · <kbd>Space</kbd> pausa
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
