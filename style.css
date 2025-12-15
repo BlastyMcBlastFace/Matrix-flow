@@ -5,8 +5,6 @@
   --hud-border: rgba(72, 255, 132, 0.18);
   --hud-text: rgba(220, 255, 235, 0.92);
   --hud-muted: rgba(220, 255, 235, 0.70);
-  --btn: rgba(72,255,132,0.18);
-  --btn2: rgba(72,255,132,0.30);
 }
 
 *{ box-sizing: border-box; }
@@ -33,10 +31,10 @@ body{
   width: min(520px, calc(100vw - 32px));
   padding: 14px 14px 12px;
   border-radius: 14px;
-  background: var(--hud-bg);
-  border: 1px solid var(--hud-border);
+  background: rgba(2,4,10,0.78);
+  border: 1px solid rgba(72, 255, 132, 0.18);
   box-shadow: 0 16px 48px rgba(0,0,0,0.55);
-  color: var(--hud-text);
+  color: rgba(220, 255, 235, 0.92);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -58,7 +56,7 @@ body{
   appearance: none;
   border: 1px solid rgba(72,255,132,0.25);
   background: rgba(0,0,0,0.25);
-  color: var(--hud-text);
+  color: rgba(220, 255, 235, 0.92);
   width: 32px;
   height: 32px;
   border-radius: 10px;
@@ -71,7 +69,7 @@ body{
 .hud__label{
   display:block;
   font-size: 12px;
-  color: var(--hud-muted);
+  color: rgba(220, 255, 235, 0.70);
   margin: 10px 0;
 }
 
@@ -82,7 +80,7 @@ body{
   border-radius: 12px;
   border: 1px solid rgba(72,255,132,0.22);
   background: rgba(0,0,0,0.35);
-  color: var(--hud-text);
+  color: rgba(220, 255, 235, 0.92);
   outline: none;
 }
 .hud__textarea{ resize: vertical; min-height: 92px; }
@@ -117,14 +115,14 @@ body{
   border-radius: 12px;
   border: 1px solid rgba(72,255,132,0.25);
   background: rgba(0,0,0,0.25);
-  color: var(--hud-text);
+  color: rgba(220, 255, 235, 0.92);
   cursor: pointer;
 }
 .hud__action:hover{ border-color: rgba(72,255,132,0.55); background: rgba(0,0,0,0.35); }
 
 .hud__help{
   margin-top: 10px;
-  color: var(--hud-muted);
+  color: rgba(220, 255, 235, 0.70);
   font-size: 12px;
 }
 .hud__hint{ margin-top: 6px; }
@@ -135,7 +133,7 @@ body{
   border-radius: 12px;
   border: 1px solid rgba(72,255,132,0.16);
   background: rgba(0,0,0,0.25);
-  color: var(--hud-text);
+  color: rgba(220, 255, 235, 0.92);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   word-break: break-word;
 }
@@ -145,5 +143,5 @@ kbd{
   border-radius: 8px;
   border: 1px solid rgba(72,255,132,0.22);
   background: rgba(0,0,0,0.35);
-  color: var(--hud-text);
+  color: rgba(220, 255, 235, 0.92);
 }

@@ -1,26 +1,16 @@
-# Matrix Live Data Stream (v4) — aCurve /api/v1 integration
+# Matrix Live Data Stream (v4-fixed)
 
-Den här versionen är byggd för:
-- GET  /Tag
-- POST /MeasurementMulti
-med header:
-- Authorization: Bearer <token>
+Fixar ett fel i v4 där sidan kunde bli helt svart p.g.a. att `mode`-fältet saknades i HTML.
 
-## Så kör du snabbt
-1. Öppna sidan
-2. Tryck **S**
-3. Kontrollera:
-   - API-bas: https://acurve.kappala.se:50001/api/v1/
-   - Token: (utan "Bearer ")
-4. Klicka **Hämta /Tag** (för att auto-populera taggar om möjligt)
-5. Lägg in StartTime/EndTime + taggar
-6. Klicka **Testa /MeasurementMulti** eller låt polling gå
+## Snabb test
+- Öppna sidan
+- Tryck **S**
+- Välj **Demo (lokal data)** → då ska du alltid se Matrix-regn direkt.
 
-## Felsökning
-- Om status visar "CORS/Nät": webbläsaren blockerar anropet. Då behövs proxy eller CORS-headers på API:t.
-- Om HTTP 401/403: token/behörighet
-- Om HTTP 404: kontrollera API-bas och att den slutar med /api/v1/
+## Kör mot aCurve API
+- API-bas: https://acurve.kappala.se:50001/api/v1/
+- Token: (utan "Bearer ")
+- Lägg in taggar, start/end och kör Poll / Testa.
 
-## Säkerhet
-Bearer-token i en statisk webbsida kan läsas av användare som har tillgång till sidan.
-För produktion: använd en proxy/backend som håller token hemlig.
+## Om du får CORS
+Då blockeras anrop från webbläsaren och du behöver proxy eller CORS-headers på API:t.

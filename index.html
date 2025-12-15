@@ -30,6 +30,14 @@
 
     <div class="hud__grid">
       <label class="hud__label">
+        Läge
+        <select id="mode" class="hud__select">
+          <option value="poll" selected>Poll: /MeasurementMulti</option>
+          <option value="demo">Demo (lokal data)</option>
+        </select>
+      </label>
+
+      <label class="hud__label">
         Poll-intervall (ms)
         <input id="pollMs" class="hud__input" type="number" min="200" step="100" value="3000" />
       </label>
@@ -55,6 +63,8 @@
           <option value="UTC">UTC</option>
         </select>
       </label>
+
+      <div></div>
     </div>
 
     <label class="hud__label">
