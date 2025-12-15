@@ -85,3 +85,9 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## v5.9 — tomma svar ([]) fix
 - I `fetch=point` skickas nu **inte** Start=End, utan ett minimalt intervall lika med **en upplösningsbucket** (t.ex. `m64` => 64 min). Det gör att API:t kan returnera minst en punkt.
 - Om svaret är tomt (t.ex. `{Tag:[]}`) visas `0 punkter` i status och sidan injicerar texten `NO_DATA` i regnet.
+
+
+## v6.0 — data syns tydligare + långsammare regn
+- Nytt: **Hastighet** (0.2–1.5) för att göra regnet långsammare.
+- Nytt: **Queue-repeat** (1–10): varje queue-tecken visas flera gånger så datan inte "bränns upp" på en frame.
+- För aCurve-svar av typen `{tag:[...]}` extraheras nu kompakt `TAG:VALUE | TAG:VALUE` istället för att platta ut hela JSON.

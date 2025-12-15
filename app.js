@@ -20,6 +20,8 @@
   const chunkSizeEl = document.getElementById('chunkSize');
   const charsetEl = document.getElementById('charset');
   const trailEl = document.getElementById('trail');
+  const speedEl = document.getElementById('speed');
+  const repeatEl = document.getElementById('repeat');
   const tagsEl = document.getElementById('tags');
   const startTimeEl = document.getElementById('startTime');
   const endTimeEl = document.getElementById('endTime');
@@ -35,6 +37,15 @@
   const btnTestMeas = document.getElementById('btnTestMeas');
 
   const GREEN = 'rgba(72, 255, 132, 1)';
+  function speedScale(){
+    const v = Number(speedEl?.value || 0.7);
+    return Math.max(0.2, Math.min(1.5, v));
+  }
+  function repeatFactor(){
+    const v = Number(repeatEl?.value || 4);
+    return Math.max(1, Math.min(10, Math.floor(v)));
+  }
+
   const BG_FADE = () => Math.min(0.30, Math.max(0.02, Number(trailEl?.value || 0.08)));
 
   let W = 0, H = 0, DPR = 1;
@@ -136,17 +147,78 @@
     return out;
   }
 
+  function shortTagName(k){
+    const s = String(k||'');
+    // Split on backslash, slash, dot and take last chunk
+    const parts = s.split(/\\|\/|\./).filter(Boolean);
+    return parts.length ? parts[parts.length-1] : s;
+  }
+  function extractValuePoint(x){
+    if (x == null) return null;
+    if (typeof x === 'number' || typeof x === 'string' || typeof x === 'boolean') return x;
+    if (Array.isArray(x)) {
+      if (!x.length) return null;
+      return extractValuePoint(x[x.length-1]);
+    }
+    if (typeof x === 'object') {
+      // common fields
+      const v = x.Value ?? x.value ?? x.Val ?? x.val ?? x.Y ?? x.y ?? x.Data ?? x.data ?? null;
+      if (v != null) return extractValuePoint(v);
+      // If object has a single key, drill
+      const keys = Object.keys(x);
+      if (keys.length === 1) return extractValuePoint(x[keys[0]]);
+    }
+    return null;
+  }
+  function extractCompactStream(payload){
+    try {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return '';
+      const parts = [];
+      for (const [k,v] of Object.entries(payload)) {
+        const val = extractValuePoint(v);
+        if (val == null) continue;
+        const tag = shortTagName(k);
+        // keep it mostly numeric-looking
+        parts.push(`${tag}:${val}`);
+      }
+      return parts.join(' | ');
+    } catch { return ''; }
+  }
   function normalizeApiPayload(payload) {
     try {
+      const compact = extractCompactStream(payload);
+      if (compact) {
+        enqueueToken(' ' + compact + ' ');
+        return;
+      }
       const toks = flattenToTokens(payload);
       if (toks.length === 0) return;
       enqueueToken(toks.join('').slice(0, 1600));
     } catch {}
   }
 
+  let liveRepeatLeft = 0;
+  let liveChar = '';
+  function nextLiveChar(){
+    if (dataQueue.length === 0) return '';
+    // Skip whitespace so it doesn't look like "no data" in the stream
+    while (dataQueue.length > 0) {
+      const c = dataQueue.shift();
+      if (c && !/\s/.test(c)) return c;
+    }
+    return '';
+  }
   function takeTokenOrRandom(charset) {
-    // Always consume live data when available
-    if (dataQueue.length > 0) return dataQueue.shift();
+    // Always use queue when it has data, but repeat chars to avoid draining too fast
+    if (dataQueue.length > 0) {
+      if (liveRepeatLeft <= 0) {
+        liveChar = nextLiveChar() || charset[(Math.random() * charset.length) | 0];
+        liveRepeatLeft = repeatFactor();
+      }
+      liveRepeatLeft--;
+      return liveChar;
+    }
+    liveRepeatLeft = 0;
     return charset[(Math.random() * charset.length) | 0];
   }
 
@@ -505,6 +577,8 @@
   if (chunkSizeEl) chunkSizeEl.value = saved.chunkSize ?? 2;
   if (charsetEl) charsetEl.value = saved.charset ?? 'matrix';
   if (trailEl) trailEl.value = saved.trail ?? 0.08;
+  if (speedEl) speedEl.value = saved.speed ?? 0.7;
+  if (repeatEl) repeatEl.value = saved.repeat ?? 4;
   if (tagsEl) tagsEl.value = saved.tags ?? '';
   if (tagsEl && !tagsEl.value.trim() && Array.isArray(DEFAULT_TAGS) && DEFAULT_TAGS.length) {
     tagsEl.value = DEFAULT_TAGS.slice(0, 10).join('\n');
@@ -527,6 +601,8 @@
       chunkSize: Number(chunkSizeEl?.value || 2),
       charset: charsetEl?.value || 'matrix',
       trail: Number(trailEl?.value || 0.08),
+      speed: Number(speedEl?.value || 0.7),
+      repeat: Number(repeatEl?.value || 4),
       tags: tagsEl?.value || '',
       startTime: startTimeEl?.value || '',
       endTime: endTimeEl?.value || '',
@@ -540,7 +616,7 @@
     }));
   }
 
-  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl, fetchModeEl].filter(Boolean);
+  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, speedEl, repeatEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl, fetchModeEl].filter(Boolean);
   for (const el of settingEls) el.addEventListener('change', persistSettings);
 
   // Buttons
@@ -609,7 +685,7 @@
           const yPx = c.y * this.stepY;
 
           const tail = Math.max(6, Math.floor(c.burst - c.burstDecay));
-          c.burstDecay += 0.015 * c.speed;
+          c.burstDecay += 0.015 * c.speed * speedScale();
 
           for (let t = 0; t < tail; t++) {
             const y = yPx - t * this.stepY;
@@ -627,7 +703,7 @@
             ctx.fillText(ch, x, y);
           }
 
-          c.y += c.speed;
+          c.y += c.speed * speedScale();
           if (yPx > H + 200) {
             c.y = (Math.random() * -90) | 0;
             c.speed = (0.55 + Math.random() * 1.25) * speedMul;
@@ -643,9 +719,9 @@
   }
 
   const layers = [
-    makeLayer(12, 0.85, 0.95, 6, 0.55),
-    makeLayer(16, 1.00, 1.00, 9, 0.75),
-    makeLayer(20, 1.10, 0.85, 12, 0.95),
+    makeLayer(12, 0.70, 0.95, 6, 0.55),
+    makeLayer(16, 0.82, 1.00, 9, 0.75),
+    makeLayer(20, 0.92, 0.85, 12, 0.95),
   ];
 
   let paused = false;
