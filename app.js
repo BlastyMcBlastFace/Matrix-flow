@@ -11,6 +11,7 @@
   const canvas = document.getElementById('matrix');
   const debugOverlayEl = document.getElementById('debugOverlay');
   const showDebugEl = document.getElementById('showDebug');
+  const headLockEl = document.getElementById('headLock');
   const ctx = canvas.getContext('2d', { alpha: false });
 
   // HUD elements (guarded)
@@ -82,7 +83,16 @@
   }
 
   // Data buffer
-  const dataQueue = [];
+  const dataQueue = []; // legacy char-queue (kept, but not used for heads)
+  const valueQueue = []; // numeric tokens for heads
+  const MAX_VALUE_QUEUE = 2000;
+  function enqueueValueToken(tok){
+    const s = String(tok ?? '').trim();
+    if (!s) return;
+    valueQueue.push(s);
+    if (valueQueue.length > MAX_VALUE_QUEUE) valueQueue.splice(0, valueQueue.length - MAX_VALUE_QUEUE);
+  }
+
   // For streaming mode: only request data since last successful fetch
   let lastSuccessfulEndDate = null;
   // Adaptive throttling when API rejects with "exceeded allowed read operations"
@@ -101,7 +111,7 @@
     if (!debugOverlayEl || debugOverlayEl.classList.contains('hidden')) return;
     const q = (typeof dataQueue !== 'undefined') ? dataQueue.length : 0;
     debugOverlayEl.textContent =
-      `QUEUE: ${q}\n` +
+      `QUEUE(chars): ${q} | QUEUE(values): ${valueQueue.length}\n` +
       (lastRequestInfo ? `REQ: ${lastRequestInfo}\n` : '') +
       (lastResponseInfo ? `RES: ${lastResponseInfo}\n` : '') +
       `INJECT: ${lastInjected}`;
@@ -203,6 +213,21 @@
     }
     return null;
   }
+  function extractValueStream(payload){
+    try {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+      const vals = [];
+      for (const v of Object.values(payload)) {
+        const val = extractValuePoint(v);
+        if (val == null) continue;
+        const outVal = formatNumeric2(val);
+        if (!outVal) continue;
+        vals.push(outVal);
+      }
+      return vals;
+    } catch { return []; }
+  }
+
   function extractCompactStream(payload){
     try {
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return '';
@@ -220,11 +245,19 @@
   }
   function normalizeApiPayload(payload) {
     try {
-      const compact = extractCompactStream(payload);
-      if (compact) {
-        lastInjected = compact;
+      const verbose = extractCompactStream(payload);
+      const valuesArr = extractValueStream(payload);
+      if ((valuesArr && valuesArr.length) || verbose) {
+        // Enqueue numeric values as separate tokens for column heads
+        if (valuesArr && valuesArr.length) {
+          for (const v of valuesArr) enqueueValueToken(v);
+        }
+        // For the visual rain injection (chars), we still inject a compact string so something flows
+        const injectStr = (valuesArr && valuesArr.length) ? valuesArr.join('   ') : verbose;
+        lastInjected = injectStr;
+        if (verbose && verbose !== injectStr) lastInjected = `${injectStr}\n[verbose] ${verbose}`;
         const rep = repeatFactor();
-        for (let i = 0; i < rep; i++) enqueueToken(' ' + compact + '   ');
+        for (let i = 0; i < rep; i++) enqueueToken(' ' + injectStr + '   ');
         updateDebug();
         return;
       }
@@ -236,14 +269,34 @@
       updateDebug();
     } catch {}
   }
-  function takeTokenOrRandom(charset) {
-    if (dataQueue.length > 0) {
-      while (dataQueue.length > 0) {
-        const c = dataQueue.shift();
-        if (c && !/\s/.test(c)) return c; // skip whitespace
-      }
+  function takeFromQueue() {
+    while (dataQueue.length > 0) {
+      const c = dataQueue.shift();
+      if (c && !/\s/.test(c)) return c;
     }
+    return '';
+  }
+  function randomChar(charset){
     return charset[(Math.random() * charset.length) | 0];
+  }
+  function randomDigit(){
+    return String((Math.random() * 10) | 0);
+  }
+  function nextHeadToken(){
+    // Prefer numeric value tokens from API
+    if (valueQueue.length > 0) return valueQueue.shift();
+    // Fallback: readable random two-decimal number
+    return (Math.random() * 100).toFixed(2);
+  }
+
+  function nextHeadChar(charset){
+    // Prefer data chars, but fall back to digits so heads are readable
+    const c = takeFromQueue();
+    return c || randomDigit();
+  }
+
+  function takeTokenOrRandom(charset) {
+    return randomChar(charset);
   }
 
   function setApiStatus(text) {
@@ -615,6 +668,7 @@
   if (speedEl) speedEl.value = saved.speed ?? 0.7;
   if (repeatEl) repeatEl.value = saved.repeat ?? 4;
   if (showDebugEl) showDebugEl.checked = saved.showDebug ?? false;
+  if (headLockEl) headLockEl.checked = saved.headLock ?? true;
   setDebugVisible(showDebugEl?.checked);
   updateDebug();
   if (tagsEl) tagsEl.value = saved.tags ?? '';
@@ -642,6 +696,7 @@
       speed: Number(speedEl?.value || 0.7),
       repeat: Number(repeatEl?.value || 4),
       showDebug: Boolean(showDebugEl?.checked),
+      headLock: Boolean(headLockEl?.checked),
       tags: tagsEl?.value || '',
       startTime: startTimeEl?.value || '',
       endTime: endTimeEl?.value || '',
@@ -655,7 +710,7 @@
     }));
   }
 
-  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, speedEl, repeatEl, showDebugEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl, fetchModeEl].filter(Boolean);
+  const settingEls = [baseUrlEl, tokenEl, pollMsEl, chunkSizeEl, charsetEl, trailEl, speedEl, repeatEl, showDebugEl, headLockEl, tagsEl, startTimeEl, endTimeEl, resTypeEl, resNumEl, tsTypeEl, modeEl, timeModeEl, lookbackMinEl, fetchModeEl].filter(Boolean);
   for (const el of settingEls) el.addEventListener('change', persistSettings);
   if (showDebugEl) showDebugEl.addEventListener('change', () => {
     setDebugVisible(showDebugEl.checked);
@@ -711,6 +766,7 @@
           speed: (0.55 + Math.random() * 1.25) * speedMul,
           burst: 12 + ((Math.random() * 28) | 0),
           burstDecay: 0.0,
+          headToken: null,
         }));
         this.lastW = W;
       },
@@ -753,6 +809,7 @@
             c.speed = (0.55 + Math.random() * 1.25) * speedMul;
             c.burst = 12 + ((Math.random() * 28) | 0);
             c.burstDecay = 0.0;
+            c.headToken = headLockEl?.checked ? nextHeadToken() : nextHeadToken();
           }
         }
         ctx.shadowBlur = 0;

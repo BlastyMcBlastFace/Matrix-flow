@@ -104,3 +104,17 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 
 ## v6.2c
 - Fixar en syntaxbugg i app.js (rensar kvarvarande repeat-fragment) så sidan renderar igen.
+
+
+## v6.4 — head låst + data syns tydligare
+- Första tecknet (head) i varje kolumn är **låst** under hela fallet och ritas sist (minskar flimret).
+- Head hämtas primärt från API-queue (så data syns), medan spåret bakom är slumptecken.
+- Injicerar i första hand **numeriska värden** (två decimaler) i regnet; taggnamn syns i debug overlay.
+- Ny toggle: **Lås första tecknet från data**.
+
+
+## v6.5 — head visar hela talet
+- Numeriska värden från API:t läggs i en separat **valueQueue**.
+- Varje kolumn får en **headToken** (t.ex. `12.34`) som är låst under hela fallet.
+- Spåret bakom är fortsatt slumptecken.
+- Debug overlay visar både QUEUE(values) och senaste INJECT.
