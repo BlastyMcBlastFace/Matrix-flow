@@ -68,6 +68,11 @@
 
   // Data buffer
   const dataQueue = [];
+  // For streaming mode: only request data since last successful fetch
+  let lastSuccessfulEndDate = null;
+  // Adaptive throttling when API rejects with "exceeded allowed read operations"
+  let adaptiveFactor = 1; // increases 1,2,4,8...
+  let lastOpsExceededAt = 0;
   const MAX_QUEUE = 9000;
 
   function enqueueToken(tok) {
@@ -143,6 +148,18 @@
   }
 
 
+
+  function parseLocalYYYYMMDDHHmm(s){
+    const t = String(s||'').trim();
+    // Expect "YYYY-MM-DD HH:mm" (or with :ss)
+    const m = t.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+    const hh = Number(m[4]), mm = Number(m[5]), ss = Number(m[6] || 0);
+    const dt = new Date(y, mo, d, hh, mm, ss, 0);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
   function pad2(n){ return String(n).padStart(2,'0'); }
 
   function normalizeTimeInput(s){
@@ -174,29 +191,70 @@
   }
 
   function buildMeasurementBody() {
-    const rawTags = (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+    const rawTagsAll = (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+    // Hard cap to avoid massive read operations if someone pastes hundreds of tags
+    const MAX_TAGS = 20;
+    const rawTags = rawTagsAll.slice(0, MAX_TAGS);
+    const tagsTruncated = rawTagsAll.length > MAX_TAGS;
 
     // Manual times (what user typed)
     let start = normalizeTimeInput(startTimeEl?.value || '');
     let end = normalizeTimeInput(endTimeEl?.value || '');
 
-    // Latest mode: compute a rolling window ending "now" in the format the API spec shows: YYYY-MM-DD HH:mm
     const tm = (timeModeEl?.value || 'manual').toLowerCase();
+    // User lookback
+    const lookbackUser = Math.max(1, Number(lookbackMinEl?.value || 60));
+    // Adaptive lookback (shrinks on ops exceeded)
+    const lookback = Math.max(1, Math.floor(lookbackUser / Math.max(1, adaptiveFactor)));
+
+    // Latest mode:
+    // - compute "end" as now-1min (avoid server-clock skew)
+    // - request ONLY from lastSuccessfulEndDate (delta), else lookback window
     if (tm === 'latest') {
-      const lookback = Math.max(1, Number(lookbackMinEl?.value || 60));
-      // Use server-safe window: end a bit in the past to avoid "future" vs server clock (common cause of 400)
-      const now = new Date(Date.now() - 60 * 1000);
-      const from = new Date(now.getTime() - lookback * 60 * 1000);
-      end = formatLocalYYYYMMDDHHmm(now);
-      start = formatLocalYYYYMMDDHHmm(from);
+      const endDate = new Date(Date.now() - 60 * 1000);
+      const fromDate = new Date(endDate.getTime() - lookback * 60 * 1000);
+
+      // Delta: after first successful call, only fetch new interval since last end
+      const startDate = lastSuccessfulEndDate ? lastSuccessfulEndDate : fromDate;
+
+      end = formatLocalYYYYMMDDHHmm(endDate);
+      start = formatLocalYYYYMMDDHHmm(startDate);
     }
+
+    // Resolution
+    const resType = (resTypeEl?.value || 'h').trim();
+    let resNum = Number(resNumEl?.value || 1);
+    // Also apply adaptive factor to resolution to reduce points
+    resNum = Math.max(1, Math.floor(resNum * Math.max(1, adaptiveFactor)));
+
+    // Guard: try to avoid "exceeded allowed read operations"
+    // Approx points per tag:
+    //  - if resType is 'm' => minutes / resNum, 'h' => hours/resNum, 's' => seconds/resNum, 'd' => days/resNum
+    // We don't know server limit, so we keep it conservative.
+    try {
+      const sD = parseLocalYYYYMMDDHHmm(start);
+      const eD = parseLocalYYYYMMDDHHmm(end);
+      if (sD && eD && eD > sD && rawTags.length > 0) {
+        const spanSec = (eD.getTime() - sD.getTime()) / 1000;
+        const unitSec = (resType === 's') ? 1 : (resType === 'm') ? 60 : (resType === 'h') ? 3600 : (resType === 'd') ? 86400 : 3600;
+        const pointsPerTag = Math.max(1, Math.ceil(spanSec / (unitSec * Math.max(1, resNum))));
+        const estOps = pointsPerTag * rawTags.length;
+
+        // If estimated operations are high, increase resolution number automatically
+        const MAX_EST_OPS = 2000; // conservative
+        if (estOps > MAX_EST_OPS) {
+          const factor = Math.ceil(estOps / MAX_EST_OPS);
+          resNum = Math.max(resNum, factor);
+        }
+      }
+    } catch {}
 
     return {
       TagName: rawTags,
       StartTime: start,
       EndTime: end,
-      ResolutionType: (resTypeEl?.value || 'h').trim(),
-      ResolutionNumber: Number(resNumEl?.value || '1'),
+      ResolutionType: resType,
+      ResolutionNumber: resNum,
       ReturnTimeStampType: (tsTypeEl?.value || 'LOCAL').trim(),
     };
   }
@@ -275,14 +333,39 @@
       if (!res.ok) {
         const body = buildMeasurementBody();
         const snippet = (typeof payload === 'string') ? String(payload).slice(0, 180) : '';
-        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime}` + (snippet ? ` · ${snippet}` : ''));
+        const opsExceeded = (typeof payload === 'string') && payload.toLowerCase().includes('exceeded allowed read operations');
+        if (opsExceeded) {
+          // Back off quickly (shrink lookback + increase resolution) for next attempts
+          const now = Date.now();
+          if (now - lastOpsExceededAt > 2000) { // avoid spamming bumps
+            adaptiveFactor = Math.min(64, adaptiveFactor * 2);
+            lastOpsExceededAt = now;
+          }
+        }
+        const tagCountAll = (tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).length;
+        const capNote = tagCountAll > 20 ? ' · taggar: kapade till 20' : '';
+        const adaptNote = adaptiveFactor > 1 ? ` · adaptive×${adaptiveFactor}` : '';
+        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime}`
+          + (snippet ? ` · ${snippet}` : '')
+          + capNote + adaptNote
+        );
         try { console.warn('MeasurementMulti non-OK', res.status, { requestBody: body, response: payload }); } catch {}
         normalizeApiPayload(payload);
         return false;
       }
 
       normalizeApiPayload(payload);
-      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length}`);
+      // Update delta cursor only on success
+      try {
+        const bodyUsed = buildMeasurementBody();
+        const eD = parseLocalYYYYMMDDHHmm(bodyUsed.EndTime);
+        if (eD) lastSuccessfulEndDate = eD;
+      } catch {}
+      const bodyUsed2 = buildMeasurementBody();
+      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length}`
+        + (adaptiveFactor > 1 ? ` · adaptive×${adaptiveFactor}` : '')
+        + (((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).length) > 20 ? ' · taggar: kapade till 20' : '')
+      );
       persistSettings();
       return true;
     } catch (e) {
@@ -337,7 +420,7 @@
   const saved = (() => { try { return JSON.parse(localStorage.getItem('matrix_settings_v4_fixed') || '{}'); } catch { return {}; } })();
   if (baseUrlEl) baseUrlEl.value = saved.baseUrl ?? 'https://acurve.kappala.se:50001/api/v1/';
   if (tokenEl) tokenEl.value = saved.token ?? '';
-  if (pollMsEl) pollMsEl.value = saved.pollMs ?? 3000;
+  if (pollMsEl) pollMsEl.value = saved.pollMs ?? 10000;
   if (charsetEl) charsetEl.value = saved.charset ?? 'matrix';
   if (trailEl) trailEl.value = saved.trail ?? 0.08;
   if (tagsEl) tagsEl.value = saved.tags ?? '';

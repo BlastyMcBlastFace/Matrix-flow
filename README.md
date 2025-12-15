@@ -31,3 +31,19 @@ Om du får 403 när du väljer vissa tider är det ofta att intervallet är otil
 - **ResolutionNumber** skickas som **number**.
 - I **Senaste-läge** sätts EndTime till **nu minus 1 minut** (undviker att servern tolkar EndTime som "i framtiden" p.g.a. klockskew).
 - ISO-inmatning i Start/End normaliseras till **YYYY-MM-DD HH:mm**.
+
+
+## v5.2 — fix för 'exceeded allowed read operations'
+- **Delta-hämtning i Senaste-läge**: efter första lyckade anropet hämtas bara nya data sedan förra EndTime.
+- **Auto-grovning av upplösning**: om uppskattade operations blir höga höjs ResolutionNumber automatiskt.
+- Standard **poll-intervall** är höjt till 10 s för att inte slå i begränsningar.
+
+### Tumregel
+Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, korta lookback, eller öka upplösningen.
+
+
+## v5.3 — adaptiv throttling vid operations-limit
+- Om API:t svarar med **"exceeded allowed read operations"** så ökar sidan automatiskt en **adaptive×2** (2,4,8…):
+  - lookback-fönstret krymps
+  - ResolutionNumber höjs
+- Taggar hårdkapas till **20** för att undvika extrema anrop.
