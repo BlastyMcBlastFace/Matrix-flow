@@ -1,4 +1,4 @@
-/* Matrix Live Data Stream
+   /* Matrix Live Data Stream
    - Multi-layer canvas "digital rain"
    - Data injection from API (SSE or polling fetch) with demo fallback
    - Controls: S (settings), F (fullscreen), Space (pause)
@@ -137,7 +137,13 @@
     async function tick() {
       if (!alive) return;
       try {
-        const res = await fetch(endpoint, { cache: 'no-store' });
+        const res = await fetch(endpoint, {
+        cache: 'no-store',
+        headers: {
+       'Authorization': 'Bearer ff2d6750f4184ddcb46a162eeea82d54',
+       'X-API-Key': 'DIN_NYCKEL_HÄR',
+        }
+});
         // If endpoint isn't JSON, we'll still read as text
         const ct = (res.headers.get('content-type') || '').toLowerCase();
         if (ct.includes('application/json')) {
