@@ -128,3 +128,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## v6.9 — hover tooltip för taggnamn
 - Varje headtoken kommer från API-kön som ett objekt `{tag,value}`.
 - Hovra över en headtoken för att se **TagName + värde** i en tooltip.
+
+
+## v6.10 — hover fungerar
+- Tooltip hit-test körs nu varje frame (matchar requestAnimationFrame(frame)).
+- Hover-regioner byggs om varje frame och använder samma koordinatsystem (xPx/yPx).

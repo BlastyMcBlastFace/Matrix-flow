@@ -22,6 +22,23 @@
     if (!tooltipEl) return;
     tooltipEl.classList.add('hidden');
   }
+
+  function hitTestHover(){
+    if (!mousePx.inside) { hideTooltip(); return; }
+    let hit = null;
+    for (let i = hoverRegions.length - 1; i >= 0; i--) {
+      const r = hoverRegions[i];
+      if (mousePx.x >= r.left && mousePx.x <= r.right && mousePx.y >= r.top && mousePx.y <= r.bottom) { hit = r; break; }
+    }
+    if (hit) {
+      const tag = hit.headObj?.tag ? String(hit.headObj.tag) : '(okänd tag)';
+      const val = hit.value ? String(hit.value) : '';
+      showTooltip(mousePx.pageX, mousePx.pageY, `${tag}\n${val}`);
+    } else {
+      hideTooltip();
+    }
+  }
+
   function showTooltip(pageX, pageY, text){
     if (!tooltipEl) return;
     tooltipEl.textContent = text;
@@ -886,14 +903,14 @@ function collectNumericValues(node, out, depth=0){
             }
              
           
-          // Register hover region for this head token
+          // Register hover region for this head token (for tooltip)
           try {
-            const cw = ctx.measureText('0').width;
-            const w = Math.max(cw * Math.max(3, String(c.headToken).length), cw * 3);
-            const left = x - w/2 - 4;
-            const right = x + w/2 + 4;
-            const top = yPx - 1 * this.stepY;
-            const bottom = yPx + (L+1) * this.stepY;
+            const tokenLen = String(c.headToken || '').length;
+            const w = Math.max(this.stepX * 0.9, tokenLen * (this.stepX * 0.55));
+            const left = xPx - w/2;
+            const right = xPx + w/2;
+            const top = yPx - this.stepY * 0.8;
+            const bottom = yPx + (L + 0.8) * this.stepY;
             hoverRegions.push({ left, right, top, bottom, headObj: c.headObj, value: c.headToken });
           } catch {}
 }
@@ -926,11 +943,13 @@ c.y += c.speed * speedScale();
 
   let paused = false;
   function frame() {
+    hoverRegions.length = 0; // rebuild regions each frame
     if (!paused) {
       ctx.fillStyle = `rgba(0, 0, 0, ${BG_FADE()})`;
       ctx.fillRect(0, 0, W, H);
       for (const L of layers) L.draw();
     }
+    hitTestHover();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
