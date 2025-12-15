@@ -137,9 +137,3 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 
 ## v6.11 — hover fix
 - Fixar en variabelmiss i hover-regionen (använder `x` i pixlar istället för odefinierad `xPx`).
-
-
-## v6.12 — alla strömmar startar med headtoken från API
-- Kolumner som saknar headtoken **väntar ovanför skärmen** tills en API-token finns.
-- Om valueQueue inte räcker används senaste kända värden per tag (cache) som fortfarande är API-deriverade.
-- Debug overlay visar `CACHE(tags)`.
