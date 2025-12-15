@@ -18,17 +18,22 @@
 
     <label class="hud__label">
       API-endpoint (tomt = demo)
-      <input id="endpoint" class="hud__input" placeholder="https://…/api/stream" />
+      <input id="endpoint" class="hud__input" placeholder="https://…/api/data" />
+    </label>
+
+    <label class="hud__label">
+      Bearer token (lämna tomt om ej behövs)
+      <input id="token" class="hud__input" placeholder="eyJhbGciOi..." />
     </label>
 
     <div class="hud__grid">
       <label class="hud__label">
         Läsmetod
         <select id="mode" class="hud__select">
-          <option value="auto">Auto (SSE om möjligt)</option>
-          <option value="sse">SSE (EventSource)</option>
-          <option value="poll">Polling (fetch)</option>
+          <option value="poll">Polling (fetch, stöder headers)</option>
           <option value="demo">Demo (lokal data)</option>
+          <option value="sse">SSE (EventSource, INGA headers)</option>
+          <option value="auto">Auto</option>
         </select>
       </label>
 
@@ -40,8 +45,8 @@
       <label class="hud__label">
         Teckenuppsättning
         <select id="charset" class="hud__select">
-          <option value="digits">Siffror (0–9)</option>
           <option value="matrix">Matrix (katakana + siffror)</option>
+          <option value="digits">Siffror (0–9)</option>
           <option value="hex">Hex (0–9, A–F)</option>
         </select>
       </label>
@@ -53,7 +58,8 @@
     </div>
 
     <div class="hud__help">
-      <kbd>S</kbd> inställningar · <kbd>F</kbd> fullscreen · <kbd>Space</kbd> pausa
+      <div><b>Tips:</b> Välj <b>Polling</b> när du använder Bearer token.</div>
+      <div><kbd>S</kbd> inställningar · <kbd>F</kbd> fullscreen · <kbd>Space</kbd> pausa</div>
     </div>
   </div>
 
