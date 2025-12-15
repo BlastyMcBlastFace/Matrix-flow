@@ -140,7 +140,35 @@
     return valueQueue.length ? valueQueue.shift() : null;
   }
 
-  // For streaming mode: only request data since last successful fetch
+  
+  // Cache of last seen values per tag (API-derived)
+  const lastValueCache = new Map(); // tag -> value
+  let lastValueList = []; // [{tag,value}]
+  let lastValueRR = 0;
+
+  function updateLastValues(pairs){
+    try{
+      for (const p of pairs){
+        if (!p || !p.tag) continue;
+        lastValueCache.set(p.tag, p.value);
+      }
+      lastValueList = Array.from(lastValueCache.entries()).map(([tag,value]) => ({tag, value}));
+      if (lastValueRR >= lastValueList.length) lastValueRR = 0;
+    } catch {}
+  }
+
+  function nextApiHead(){
+    // Prefer fresh queued values, then fall back to last known values (still API-derived)
+    const o = nextHeadToken();
+    if (o) return o;
+    if (lastValueList.length){
+      const picked = lastValueList[lastValueRR % lastValueList.length];
+      lastValueRR = (lastValueRR + 1) % lastValueList.length;
+      return picked;
+    }
+    return null;
+  }
+// For streaming mode: only request data since last successful fetch
   let lastSuccessfulEndDate = null;
   // Adaptive throttling when API rejects with "exceeded allowed read operations"
   let adaptiveFactor = 1; // increases 1,2,4,8...
@@ -160,6 +188,7 @@
     debugOverlayEl.textContent =
       `QUEUE(chars): ${q} | QUEUE(values): ${valueQueue.length}\n` +
       (valueQueue.length ? `NEXT_VALUES: ${valueQueue.slice(0, 8).map(o => `${o.tag||'?'}` + ':' + `${o.value}`).join(' , ')}\n` : '') +
+      `CACHE(tags): ${lastValueList.length}\n` +
       (lastRequestInfo ? `REQ: ${lastRequestInfo}\n` : '') +
       (lastResponseInfo ? `RES: ${lastResponseInfo}\n` : '') +
       `INJECT: ${lastInjected}`;
@@ -866,12 +895,21 @@ function collectNumericValues(node, out, depth=0){
           const c = this.columns[i];
           const x = Math.floor(i * (fontPx * 0.62));
           const yPx = c.y * this.stepY;
-          // Assign head token only before the column enters the screen (so it stays stable for the whole fall)
-          if (!c.headToken && c.y < 0 && valueQueue.length > 0) {
-            c.headObj = nextHeadToken();
-            c.headToken = c.headObj ? String(c.headObj.value) : '';
-            c.headChars = c.headToken ? String(c.headToken).split('') : null;
+                    // Assign head token only before the column enters the screen.
+          // If no API value is available yet, keep the column above the screen so every visible stream starts with API head.
+          if (!c.headToken && c.y < 0) {
+            const head = nextApiHead();
+            if (head) {
+              c.headObj = head;
+              c.headToken = String(head.value);
+              c.headChars = c.headToken.split('');
+            } else {
+              // freeze above screen
+              c.y = Math.min(c.y, -2);
+              c.speed = 0;
+            }
           }
+          if (c.headToken && c.speed === 0) { c.speed = (0.55 + Math.random() * 1.25) * speedMul; }
 
 
           const tail = Math.max(6, Math.floor(c.burst - c.burstDecay));
@@ -923,9 +961,11 @@ c.y += c.speed * speedScale();
             c.headToken = '';
             c.headChars = null;
             c.headObj = null;
+            c.speed = (0.55 + Math.random() * 1.25) * speedMul;
             c.headToken = '';
             c.headChars = null;
             c.headObj = null;
+            c.speed = (0.55 + Math.random() * 1.25) * speedMul;
           }
         }
         ctx.shadowBlur = 0;
