@@ -158,3 +158,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 - Lägger API-headtokens i en **headPool** (senaste ~250 tokens) som kan **återanvändas** av många kolumner.
 - Head plockar först från färska kön, annars round-robin från poolen (så samma API-värde kan synas i flera strömmar).
 - Debug overlay visar `POOL(size)`.
+
+
+## v6.11.5b — fler strömmar kan visa API-head (återanvändning via pool)
+- Tar head först från queue, annars återanvänder round-robin från poolen (samma API-data kan synas i flera strömmar).
+- Fixar dubbla funktionsdefinitioner som kunde krascha sidan.

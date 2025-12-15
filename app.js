@@ -146,12 +146,19 @@
     valueQueue.push({ tag: t, value: v });
     if (valueQueue.length > MAX_VALUE_QUEUE) valueQueue.splice(0, valueQueue.length - MAX_VALUE_QUEUE);
   }
-  function nextHeadTokenReusable(){
-    return valueQueue.length ? valueQueue.shift() : null;
-  }
 
-  
-  // Recent API-derived head tokens (can be reused across many streams)
+  function nextHeadToken(){ return valueQueue.length ? valueQueue.shift() : null; }
+
+  function nextHeadTokenReusable(){
+    // Prefer fresh queue, else reuse from pool WITHOUT consuming
+    const fresh = nextHeadToken();
+    if (fresh) return fresh;
+    if (!headPool.length) return null;
+    const o = headPool[headPoolIdx % headPool.length];
+    headPoolIdx = (headPoolIdx + 1) % headPool.length;
+    return o;
+  }
+// Recent API-derived head tokens (can be reused across many streams)
   const headPool = [];
   const HEAD_POOL_MAX = 250;
   let headPoolIdx = 0;
@@ -161,16 +168,6 @@
     headPool.push(obj);
     if (headPool.length > HEAD_POOL_MAX) headPool.splice(0, headPool.length - HEAD_POOL_MAX);
     if (headPoolIdx >= headPool.length) headPoolIdx = 0;
-  }
-
-  function nextHeadTokenReusable(){
-    // Prefer fresh queue, else reuse from pool without consuming
-    const fresh = nextHeadToken();
-    if (fresh) return fresh;
-    if (!headPool.length) return null;
-    const o = headPool[headPoolIdx % headPool.length];
-    headPoolIdx = (headPoolIdx + 1) % headPool.length;
-    return o;
   }
 // For streaming mode: only request data since last successful fetch
   let lastSuccessfulEndDate = null;
@@ -905,9 +902,16 @@ function collectNumericValues(node, out, depth=0){
           const x = Math.floor(i * (fontPx * 0.62));
           const yPx = c.y * this.stepY;
           // Assign head token only before the column enters the screen (so it stays stable for the whole fall)
-          if (!c.headToken && c.y < 0 && valueQueue.length > 0) {
+          if (!c.headToken && c.y < 0) {
             c.headObj = nextHeadTokenReusable();
-            c.headToken = c.headObj ? String(c.headObj.value) : '';
+            if (!c.headObj) {
+              // No API token yet; leave headToken empty (tail continues)
+              c.headToken = '';
+              c.headChars = null;
+            } else {
+              c.headToken = String(c.headObj.value);
+              c.headChars = c.headToken.split('');
+            }
             c.headChars = c.headToken ? String(c.headToken).split('') : null;
           }
 
