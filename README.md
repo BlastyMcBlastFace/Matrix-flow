@@ -133,3 +133,7 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## v6.10 — hover fungerar
 - Tooltip hit-test körs nu varje frame (matchar requestAnimationFrame(frame)).
 - Hover-regioner byggs om varje frame och använder samma koordinatsystem (xPx/yPx).
+
+
+## v6.11 — hover fix
+- Fixar en variabelmiss i hover-regionen (använder `x` i pixlar istället för odefinierad `xPx`).

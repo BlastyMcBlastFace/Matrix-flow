@@ -907,8 +907,8 @@ function collectNumericValues(node, out, depth=0){
           try {
             const tokenLen = String(c.headToken || '').length;
             const w = Math.max(this.stepX * 0.9, tokenLen * (this.stepX * 0.55));
-            const left = xPx - w/2;
-            const right = xPx + w/2;
+            const left = x - w / 2;
+            const right = x + w / 2;
             const top = yPx - this.stepY * 0.8;
             const bottom = yPx + (L + 0.8) * this.stepY;
             hoverRegions.push({ left, right, top, bottom, headObj: c.headObj, value: c.headToken });
