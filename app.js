@@ -116,8 +116,8 @@
   }
 
   function takeTokenOrRandom(charset) {
-    const useLive = dataQueue.length > 0 && Math.random() < 0.62;
-    if (useLive) return dataQueue.shift();
+    // Always consume live data when available
+    if (dataQueue.length > 0) return dataQueue.shift();
     return charset[(Math.random() * charset.length) | 0];
   }
 
@@ -251,6 +251,10 @@
   // Poll loop
   let stopPoll = null;
   function startPolling() {
+      setInterval(() => {
+        fetchMeasurementOnce();
+      }, 1000);  // Poll every second to get the latest data.
+    } {
     stopPolling();
     let alive = true;
 
@@ -388,7 +392,7 @@
 
             const ch = (t < 2)
               ? takeTokenOrRandom(cs)
-              : (Math.random() < 0.08 ? takeTokenOrRandom(cs) : cs[(Math.random() * cs.length) | 0]);
+              : (Math.random() < 0.08 ? takeTokenOrRandom(cs) : takeTokenOrRandom(cs));
 
             ctx.fillText(ch, x, y);
           }
