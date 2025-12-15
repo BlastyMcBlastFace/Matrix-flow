@@ -1,18 +1,26 @@
-# Matrix Live Data Stream (v3) — felsökning + robust dataextract
+# Matrix Live Data Stream (v4) — aCurve /api/v1 integration
 
-## Användning
-- Tryck **S** → fyll i endpoint + token → välj **Polling**
-- Titta på raden "API: ..." i inställningsrutan. Den visar HTTP-status, svarstid och om den injicerar data.
+Den här versionen är byggd för:
+- GET  /Tag
+- POST /MeasurementMulti
+med header:
+- Authorization: Bearer <token>
 
-## Om du ser "FEL (CORS/Nät)"
-Då blockeras anropet i webbläsaren. Vanligt om:
-- du kör från GitHub Pages (origin skiljer sig)
-- API:t saknar rätt CORS-headers
+## Så kör du snabbt
+1. Öppna sidan
+2. Tryck **S**
+3. Kontrollera:
+   - API-bas: https://acurve.kappala.se:50001/api/v1/
+   - Token: (utan "Bearer ")
+4. Klicka **Hämta /Tag** (för att auto-populera taggar om möjligt)
+5. Lägg in StartTime/EndTime + taggar
+6. Klicka **Testa /MeasurementMulti** eller låt polling gå
 
-Lösning: proxy (backend/edge-function) som du anropar istället.
+## Felsökning
+- Om status visar "CORS/Nät": webbläsaren blockerar anropet. Då behövs proxy eller CORS-headers på API:t.
+- Om HTTP 401/403: token/behörighet
+- Om HTTP 404: kontrollera API-bas och att den slutar med /api/v1/
 
-## Om du ser HTTP 401/403
-Token saknas, är fel eller saknar behörighet.
-
-## Dataformat
-v3 försöker plocka ut data även från djupt nästlade JSON-strukturer genom att skapa en kompakt stream av nyckel=värde.
+## Säkerhet
+Bearer-token i en statisk webbsida kan läsas av användare som har tillgång till sidan.
+För produktion: använd en proxy/backend som håller token hemlig.

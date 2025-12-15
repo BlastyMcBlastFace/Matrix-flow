@@ -9,36 +9,29 @@
 <body>
   <canvas id="matrix"></canvas>
 
-  <!-- Minimal overlay (toggle with S) -->
+  <!-- Settings HUD (toggle with S) -->
   <div id="hud" class="hud hidden" role="dialog" aria-label="Inställningar">
     <div class="hud__row">
       <div class="hud__title">Matrix stream</div>
       <button id="hudClose" class="hud__btn" type="button" title="Stäng (S)">×</button>
     </div>
 
-    <label class="hud__label">
-      API-endpoint (tomt = demo)
-      <input id="endpoint" class="hud__input" placeholder="https://…/api/data" />
-    </label>
-
-    <label class="hud__label">
-      Bearer token (lämna tomt om ej behövs)
-      <input id="token" class="hud__input" placeholder="eyJhbGciOi..." />
-    </label>
-
-    <div class="hud__grid">
+    <div class="hud__grid2">
       <label class="hud__label">
-        Läsmetod
-        <select id="mode" class="hud__select">
-          <option value="poll">Polling (fetch, stöder headers)</option>
-          <option value="demo">Demo (lokal data)</option>
-          <option value="sse">SSE (EventSource, INGA headers)</option>
-        </select>
+        API-bas (t.ex. https://acurve…/api/v1/)
+        <input id="baseUrl" class="hud__input" placeholder="https://acurve.kappala.se:50001/api/v1/" />
       </label>
 
       <label class="hud__label">
+        Bearer token (utan "Bearer ")
+        <input id="token" class="hud__input" placeholder="ff2d…" />
+      </label>
+    </div>
+
+    <div class="hud__grid">
+      <label class="hud__label">
         Poll-intervall (ms)
-        <input id="pollMs" class="hud__input" type="number" min="200" step="100" value="1000" />
+        <input id="pollMs" class="hud__input" type="number" min="200" step="100" value="3000" />
       </label>
 
       <label class="hud__label">
@@ -54,12 +47,57 @@
         Intensitet (spår)
         <input id="trail" class="hud__input" type="number" min="0.02" max="0.30" step="0.01" value="0.08" />
       </label>
+
+      <label class="hud__label">
+        ReturnTimeStampType
+        <select id="tsType" class="hud__select">
+          <option value="LOCAL">LOCAL</option>
+          <option value="UTC">UTC</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="hud__label">
+      Taggar (en per rad)
+      <textarea id="tags" class="hud__textarea" rows="6" placeholder="TagName1&#10;TagName2"></textarea>
+    </label>
+
+    <div class="hud__grid">
+      <label class="hud__label">
+        StartTime (YYYY-MM-DD HH:mm)
+        <input id="startTime" class="hud__input" placeholder="2023-01-05 00:00" />
+      </label>
+
+      <label class="hud__label">
+        EndTime (YYYY-MM-DD HH:mm)
+        <input id="endTime" class="hud__input" placeholder="2023-01-05 12:00" />
+      </label>
+
+      <label class="hud__label">
+        ResolutionType
+        <select id="resType" class="hud__select">
+          <option value="s">s</option>
+          <option value="m">m</option>
+          <option value="h" selected>h</option>
+          <option value="d">d</option>
+        </select>
+      </label>
+
+      <label class="hud__label">
+        ResolutionNumber
+        <input id="resNum" class="hud__input" type="number" min="1" step="1" value="1" />
+      </label>
+    </div>
+
+    <div class="hud__actions">
+      <button id="btnLoadTags" class="hud__action" type="button">Hämta /Tag</button>
+      <button id="btnTestMeas" class="hud__action" type="button">Testa /MeasurementMulti</button>
     </div>
 
     <div class="hud__help">
-      <div><b>Tips:</b> Välj <b>Polling</b> när du använder Bearer token.</div>
       <div id="apiStatus" class="hud__status">API: (ej testad ännu)</div>
-      <div><kbd>S</kbd> inställningar · <kbd>F</kbd> fullscreen · <kbd>Space</kbd> pausa</div>
+      <div class="hud__hint"><kbd>S</kbd> inställningar · <kbd>F</kbd> fullscreen · <kbd>Space</kbd> pausa</div>
+      <div class="hud__hint"><b>Obs:</b> Om du kör från GitHub Pages kan CORS blockera anropet — då behövs proxy.</div>
     </div>
   </div>
 

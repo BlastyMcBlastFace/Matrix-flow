@@ -5,6 +5,8 @@
   --hud-border: rgba(72, 255, 132, 0.18);
   --hud-text: rgba(220, 255, 235, 0.92);
   --hud-muted: rgba(220, 255, 235, 0.70);
+  --btn: rgba(72,255,132,0.18);
+  --btn2: rgba(72,255,132,0.30);
 }
 
 *{ box-sizing: border-box; }
@@ -16,7 +18,6 @@ body{
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
 }
 
-/* canvas fills viewport */
 #matrix{
   position: fixed;
   inset: 0;
@@ -25,12 +26,11 @@ body{
   display: block;
 }
 
-/* HUD */
 .hud{
   position: fixed;
   right: 16px;
   bottom: 16px;
-  width: min(460px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 32px));
   padding: 14px 14px 12px;
   border-radius: 14px;
   background: var(--hud-bg);
@@ -74,7 +74,8 @@ body{
   color: var(--hud-muted);
   margin: 10px 0;
 }
-.hud__input, .hud__select{
+
+.hud__input, .hud__select, .hud__textarea{
   width: 100%;
   margin-top: 6px;
   padding: 10px 10px;
@@ -84,7 +85,8 @@ body{
   color: var(--hud-text);
   outline: none;
 }
-.hud__input:focus, .hud__select:focus{
+.hud__textarea{ resize: vertical; min-height: 92px; }
+.hud__input:focus, .hud__select:focus, .hud__textarea:focus{
   border-color: rgba(72,255,132,0.55);
   box-shadow: 0 0 0 3px rgba(72,255,132,0.10);
 }
@@ -95,11 +97,38 @@ body{
   gap: 10px 10px;
 }
 
+.hud__grid2{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 720px){
+  .hud__grid2{ grid-template-columns: 1fr 1fr; }
+}
+
+.hud__actions{
+  display:flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.hud__action{
+  flex: 1;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(72,255,132,0.25);
+  background: rgba(0,0,0,0.25);
+  color: var(--hud-text);
+  cursor: pointer;
+}
+.hud__action:hover{ border-color: rgba(72,255,132,0.55); background: rgba(0,0,0,0.35); }
+
 .hud__help{
   margin-top: 10px;
   color: var(--hud-muted);
   font-size: 12px;
 }
+.hud__hint{ margin-top: 6px; }
+
 .hud__status{
   margin-top: 8px;
   padding: 8px 10px;
