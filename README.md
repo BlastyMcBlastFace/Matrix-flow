@@ -142,3 +142,7 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## v6.11.1 — hover fix
 - Fixar hover-zoner: använde tidigare `this.stepX` (fanns inte), vilket gav NaN och inga träffar.
 - Hover-bredd beräknas nu med `colW = fontPx * 0.62` (samma som kolumnbredden i ritningen).
+
+
+## v6.11.2 — hover över alla headtokens
+- Mousemove lyssnas nu på `window` istället för canvas, så tooltip fungerar även när HUD/panelen ligger ovanpå canvas.

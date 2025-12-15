@@ -46,10 +46,19 @@
     tooltipEl.style.top = (pageY + 14) + 'px';
     tooltipEl.classList.remove('hidden');
   }
-  canvas.addEventListener('mousemove', (e) => {
-    mousePx = { ...canvasToLocal(e), inside: true, pageX: e.clientX, pageY: e.clientY };
+    // Mouse tracking (window-level) so hover works even when the HUD overlays the canvas
+  window.addEventListener('mousemove', (e) => {
+    const r = canvas.getBoundingClientRect();
+    const inside = (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+    if (!inside) {
+      mousePx = { x: -1, y: -1, inside: false, pageX: e.clientX, pageY: e.clientY };
+      return;
+    }
+    const x = (e.clientX - r.left) * (canvas.width / r.width);
+    const y = (e.clientY - r.top) * (canvas.height / r.height);
+    mousePx = { x, y, inside: true, pageX: e.clientX, pageY: e.clientY };
   });
-  canvas.addEventListener('mouseleave', () => { mousePx = { x:-1, y:-1, inside:false }; hideTooltip(); });
+  window.addEventListener('mouseleave', () => { mousePx = { x:-1, y:-1, inside:false }; hideTooltip(); });
 
   const debugOverlayEl = document.getElementById('debugOverlay');
   const showDebugEl = document.getElementById('showDebug');
