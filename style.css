@@ -169,3 +169,22 @@ kbd{
   -webkit-backdrop-filter: blur(6px);
   z-index: 50;
 }
+
+
+/* Hover tooltip */
+.tooltip{
+  position: fixed;
+  pointer-events: none;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.72);
+  border: 1px solid rgba(72,255,132,0.28);
+  color: rgba(210,255,228,0.98);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: pre;
+  z-index: 60;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}

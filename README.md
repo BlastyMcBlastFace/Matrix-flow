@@ -123,3 +123,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 - **Ingen** slump-fallback för headtokens: de ritas bara om de finns i API valueQueue.
 - Head-token skrivs vertikalt så att talet kan läsas **uppifrån och ner**.
 - Head-token tilldelas endast när kolumnen fortfarande är ovanför skärmen (så den inte kan bytas mitt i fallet).
+
+
+## v6.9 — hover tooltip för taggnamn
+- Varje headtoken kommer från API-kön som ett objekt `{tag,value}`.
+- Hovra över en headtoken för att se **TagName + värde** i en tooltip.

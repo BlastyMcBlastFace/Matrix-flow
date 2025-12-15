@@ -9,6 +9,31 @@
   'use strict';
 
   const canvas = document.getElementById('matrix');
+  const tooltipEl = document.getElementById('tooltip');
+  const hoverRegions = []; // per-frame regions for head tokens
+  let mousePx = { x: -1, y: -1, inside: false };
+  function canvasToLocal(e){
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (canvas.width / r.width);
+    const y = (e.clientY - r.top) * (canvas.height / r.height);
+    return { x, y };
+  }
+  function hideTooltip(){
+    if (!tooltipEl) return;
+    tooltipEl.classList.add('hidden');
+  }
+  function showTooltip(pageX, pageY, text){
+    if (!tooltipEl) return;
+    tooltipEl.textContent = text;
+    tooltipEl.style.left = (pageX + 14) + 'px';
+    tooltipEl.style.top = (pageY + 14) + 'px';
+    tooltipEl.classList.remove('hidden');
+  }
+  canvas.addEventListener('mousemove', (e) => {
+    mousePx = { ...canvasToLocal(e), inside: true, pageX: e.clientX, pageY: e.clientY };
+  });
+  canvas.addEventListener('mouseleave', () => { mousePx = { x:-1, y:-1, inside:false }; hideTooltip(); });
+
   const debugOverlayEl = document.getElementById('debugOverlay');
   const showDebugEl = document.getElementById('showDebug');
   const headLockEl = document.getElementById('headLock');
@@ -87,14 +112,15 @@
   // Numeric value tokens for column heads
   const valueQueue = [];
   const MAX_VALUE_QUEUE = 5000;
-  function enqueueValueToken(tok){
-    const s = String(tok ?? '').trim();
-    if (!s) return;
-    valueQueue.push(s);
+  function enqueueValueToken(tag, value){
+    const v = String(value ?? '').trim();
+    const t = String(tag ?? '').trim();
+    if (!v) return;
+    valueQueue.push({ tag: t, value: v });
     if (valueQueue.length > MAX_VALUE_QUEUE) valueQueue.splice(0, valueQueue.length - MAX_VALUE_QUEUE);
   }
   function nextHeadToken(){
-    return valueQueue.length ? valueQueue.shift() : '';
+    return valueQueue.length ? valueQueue.shift() : null;
   }
 
   // For streaming mode: only request data since last successful fetch
@@ -116,7 +142,7 @@
     const q = (typeof dataQueue !== 'undefined') ? dataQueue.length : 0;
     debugOverlayEl.textContent =
       `QUEUE(chars): ${q} | QUEUE(values): ${valueQueue.length}\n` +
-      (valueQueue.length ? `NEXT_VALUES: ${valueQueue.slice(0, 8).join(' , ')}\n` : '') +
+      (valueQueue.length ? `NEXT_VALUES: ${valueQueue.slice(0, 8).map(o => `${o.tag||'?'}` + ':' + `${o.value}`).join(' , ')}\n` : '') +
       (lastRequestInfo ? `REQ: ${lastRequestInfo}\n` : '') +
       (lastResponseInfo ? `RES: ${lastResponseInfo}\n` : '') +
       `INJECT: ${lastInjected}`;
@@ -202,7 +228,23 @@
     return String(v);
   }
 
-  function collectNumericValues(node, out, depth=0){
+  
+  function extractTagValuePairs(payload){
+    // Expected aCurve style: { "<TagName>": [ ...points... ], "<TagName2>": [...] }
+    try{
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+      const pairs = [];
+      for (const [tag, node] of Object.entries(payload)) {
+        const v = extractValuePoint(node);
+        if (v == null) continue;
+        const fv = formatNumeric2(v);
+        if (!fv) continue;
+        pairs.push({ tag, value: fv });
+      }
+      return pairs;
+    } catch { return []; }
+  }
+function collectNumericValues(node, out, depth=0){
     if (depth > 6) return;
     if (node == null) return;
     if (typeof node === 'number') { out.push(node); return; }
@@ -280,12 +322,9 @@
       collectNumericValues(payload, nums);
 
       // Format with 2 decimals and push newest last
-      const formatted = nums
-        .filter(n => Number.isFinite(n))
-        .slice(-30)
-        .map(n => n.toFixed(2));
-
-      for (const v of formatted) enqueueValueToken(v);
+      const pairs = extractTagValuePairs(payload);
+      for (const p of pairs) enqueueValueToken(p.tag, p.value);
+      const formatted = pairs.map(p => p.value);
 
       // Inject something readable into the character rain as well
       const verbose = (typeof extractCompactStream === 'function') ? (extractCompactStream(payload) || '') : '';
@@ -793,6 +832,7 @@
           burstDecay: 0.0,
           headToken: '',
           headChars: null,
+          headObj: null,
         }));
         this.lastW = W;
       },
@@ -811,7 +851,8 @@
           const yPx = c.y * this.stepY;
           // Assign head token only before the column enters the screen (so it stays stable for the whole fall)
           if (!c.headToken && c.y < 0 && valueQueue.length > 0) {
-            c.headToken = nextHeadToken();
+            c.headObj = nextHeadToken();
+            c.headToken = c.headObj ? String(c.headObj.value) : '';
             c.headChars = c.headToken ? String(c.headToken).split('') : null;
           }
 
@@ -844,7 +885,18 @@
               ctx.fillText(chars[i2], x, y2);
             }
              
-          }
+          
+          // Register hover region for this head token
+          try {
+            const cw = ctx.measureText('0').width;
+            const w = Math.max(cw * Math.max(3, String(c.headToken).length), cw * 3);
+            const left = x - w/2 - 4;
+            const right = x + w/2 + 4;
+            const top = yPx - 1 * this.stepY;
+            const bottom = yPx + (L+1) * this.stepY;
+            hoverRegions.push({ left, right, top, bottom, headObj: c.headObj, value: c.headToken });
+          } catch {}
+}
 c.y += c.speed * speedScale();
           if (yPx > H + 200) {
             c.y = (Math.random() * -90) | 0;
@@ -853,8 +905,10 @@ c.y += c.speed * speedScale();
             c.burstDecay = 0.0;
             c.headToken = '';
             c.headChars = null;
+            c.headObj = null;
             c.headToken = '';
             c.headChars = null;
+            c.headObj = null;
           }
         }
         ctx.shadowBlur = 0;
