@@ -137,3 +137,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 
 ## v6.11 — hover fix
 - Fixar en variabelmiss i hover-regionen (använder `x` i pixlar istället för odefinierad `xPx`).
+
+
+## v6.11.1 — hover fix
+- Fixar hover-zoner: använde tidigare `this.stepX` (fanns inte), vilket gav NaN och inga träffar.
+- Hover-bredd beräknas nu med `colW = fontPx * 0.62` (samma som kolumnbredden i ritningen).

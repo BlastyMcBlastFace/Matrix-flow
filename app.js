@@ -905,8 +905,9 @@ function collectNumericValues(node, out, depth=0){
           
           // Register hover region for this head token (for tooltip)
           try {
+            const colW = fontPx * 0.62;
             const tokenLen = String(c.headToken || '').length;
-            const w = Math.max(this.stepX * 0.9, tokenLen * (this.stepX * 0.55));
+            const w = Math.max(colW * 0.9, tokenLen * (colW * 0.55));
             const left = x - w / 2;
             const right = x + w / 2;
             const top = yPx - this.stepY * 0.8;
