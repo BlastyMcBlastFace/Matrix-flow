@@ -146,3 +146,9 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 
 ## v6.11.2 — hover över alla headtokens
 - Mousemove lyssnas nu på `window` istället för canvas, så tooltip fungerar även när HUD/panelen ligger ovanpå canvas.
+
+
+## v6.11.3 — effektivare API-hämtning (batch)
+- Skickar flera TagName i **samma** `/MeasurementMulti`-request (TagName-array) istället för en och en.
+- Hämtar alla chunks i varje poll (med liten spacing) så du får uppdatering för hela listan, inte round-robin.
+- Default `chunkSize` = 10.

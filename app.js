@@ -705,16 +705,21 @@ function collectNumericValues(node, out, depth=0){
 
     const loop = async () => {
       if (!alive) return;
-      // Chunk tag list to avoid API read-operation limits
+      // Batch tag list into a single request (or a few chunks) to avoid per-tag calls
       const allTags = (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
       const maxTags = 10;
       const tags = allTags.slice(0, maxTags);
-      const chunkSize = Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 2)));
+
+      // Send multiple tags in the same MeasurementMulti request (more efficient than one-by-one).
+      const chunkSize = Math.max(1, Math.min(50, Number(chunkSizeEl?.value || 10)));
       const chunks = [];
       for (let i = 0; i < tags.length; i += chunkSize) chunks.push(tags.slice(i, i + chunkSize));
-      const chunk = chunks.length ? chunks[chunkCursor % chunks.length] : [];
-      chunkCursor = (chunkCursor + 1) % Math.max(1, chunks.length);
-      await fetchMeasurementOnce(chunk);
+
+      for (let ci = 0; ci < chunks.length; ci++) {
+        await fetchMeasurementOnce(chunks[ci]);
+        // small spacing to be gentle on the API / proxy
+        if (ci < chunks.length - 1) await sleep(80);
+      }
       const ms = Math.max(500, Number(pollMsEl?.value || 10000));
       setTimeout(loop, ms);
     };
