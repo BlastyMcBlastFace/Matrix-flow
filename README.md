@@ -152,3 +152,9 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 - Skickar flera TagName i **samma** `/MeasurementMulti`-request (TagName-array) istället för en och en.
 - Hämtar alla chunks i varje poll (med liten spacing) så du får uppdatering för hela listan, inte round-robin.
 - Default `chunkSize` = 10.
+
+
+## v6.11.4 — fler strömmar visar API-data
+- Lägger API-headtokens i en **headPool** (senaste ~250 tokens) som kan **återanvändas** av många kolumner.
+- Head plockar först från färska kön, annars round-robin från poolen (så samma API-värde kan synas i flera strömmar).
+- Debug overlay visar `POOL(size)`.

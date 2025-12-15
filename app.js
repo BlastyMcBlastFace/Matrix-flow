@@ -142,14 +142,37 @@
     const v = String(value ?? '').trim();
     const t = String(tag ?? '').trim();
     if (!v) return;
+    addToHeadPool({ tag: t, value: v });
     valueQueue.push({ tag: t, value: v });
     if (valueQueue.length > MAX_VALUE_QUEUE) valueQueue.splice(0, valueQueue.length - MAX_VALUE_QUEUE);
   }
-  function nextHeadToken(){
+  function nextHeadTokenReusable(){
     return valueQueue.length ? valueQueue.shift() : null;
   }
 
-  // For streaming mode: only request data since last successful fetch
+  
+  // Recent API-derived head tokens (can be reused across many streams)
+  const headPool = [];
+  const HEAD_POOL_MAX = 250;
+  let headPoolIdx = 0;
+
+  function addToHeadPool(obj){
+    if (!obj) return;
+    headPool.push(obj);
+    if (headPool.length > HEAD_POOL_MAX) headPool.splice(0, headPool.length - HEAD_POOL_MAX);
+    if (headPoolIdx >= headPool.length) headPoolIdx = 0;
+  }
+
+  function nextHeadTokenReusable(){
+    // Prefer fresh queue, else reuse from pool without consuming
+    const fresh = nextHeadToken();
+    if (fresh) return fresh;
+    if (!headPool.length) return null;
+    const o = headPool[headPoolIdx % headPool.length];
+    headPoolIdx = (headPoolIdx + 1) % headPool.length;
+    return o;
+  }
+// For streaming mode: only request data since last successful fetch
   let lastSuccessfulEndDate = null;
   // Adaptive throttling when API rejects with "exceeded allowed read operations"
   let adaptiveFactor = 1; // increases 1,2,4,8...
@@ -168,6 +191,7 @@
     const q = (typeof dataQueue !== 'undefined') ? dataQueue.length : 0;
     debugOverlayEl.textContent =
       `QUEUE(chars): ${q} | QUEUE(values): ${valueQueue.length}\n` +
+      `POOL(size): ${headPool.length}\n` +
       (valueQueue.length ? `NEXT_VALUES: ${valueQueue.slice(0, 8).map(o => `${o.tag||'?'}` + ':' + `${o.value}`).join(' , ')}\n` : '') +
       (lastRequestInfo ? `REQ: ${lastRequestInfo}\n` : '') +
       (lastResponseInfo ? `RES: ${lastResponseInfo}\n` : '') +
@@ -882,7 +906,7 @@ function collectNumericValues(node, out, depth=0){
           const yPx = c.y * this.stepY;
           // Assign head token only before the column enters the screen (so it stays stable for the whole fall)
           if (!c.headToken && c.y < 0 && valueQueue.length > 0) {
-            c.headObj = nextHeadToken();
+            c.headObj = nextHeadTokenReusable();
             c.headToken = c.headObj ? String(c.headObj.value) : '';
             c.headChars = c.headToken ? String(c.headToken).split('') : null;
           }
