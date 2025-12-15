@@ -64,3 +64,24 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 - Knappen **Testa /MeasurementMulti** använder nu samma "Taggar per request" (chunk) som polling.
 - Statusraden visar nu `tags=<antal>` så du ser att requesten verkligen är chunkad.
 - Vid "exceeded allowed read operations" backar den automatiskt till `chunk=1` och höjer poll till minst 15 s.
+
+
+## v5.7 — "En punkt"-läge + mer debug
+- Nytt val **Hämtning**: 
+  - **Fönster** (Start–End)
+  - **En punkt** (Start=End, senaste minut) – kan vara mycket billigare på vissa API:n.
+- Statusraden visar nu `tags=`, `res=`, `chunk=` och `fetch=`.
+- Default: `chunk=1`, `resType=m`, `resNum=10`.
+
+
+## v5.8 — hård clamp när API:t har strikt operations-limit
+- Status visar nu även `fetch=`.
+- I **Senaste-läge**:
+  - `fetch=point` ger alltid **Start=End** (en datapunkt)
+  - Om API:t svarar med "exceeded allowed read operations" flera gånger (adaptive×4+) växlar den automatiskt till **point** och ökar poll till minst **30s**.
+  - Om `fetch=window` klampar den fönstret till max **5–10 min**.
+
+
+## v5.9 — tomma svar ([]) fix
+- I `fetch=point` skickas nu **inte** Start=End, utan ett minimalt intervall lika med **en upplösningsbucket** (t.ex. `m64` => 64 min). Det gör att API:t kan returnera minst en punkt.
+- Om svaret är tomt (t.ex. `{Tag:[]}`) visas `0 punkter` i status och sidan injicerar texten `NO_DATA` i regnet.

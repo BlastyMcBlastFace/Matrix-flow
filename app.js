@@ -90,6 +90,22 @@
     }
   }
 
+  
+  function payloadHasAnyData(payload){
+    try{
+      if (payload == null) return false;
+      if (Array.isArray(payload)) return payload.length > 0;
+      if (typeof payload === 'object'){
+        for (const v of Object.values(payload)){
+          if (Array.isArray(v) && v.length > 0) return true;
+          if (v && typeof v === 'object' && payloadHasAnyData(v)) return true;
+        }
+        return false;
+      }
+      return false;
+    } catch { return false; }
+  }
+
   function flattenToTokens(value, path = '', out = [], depth = 0) {
     if (depth > 7) return out;
     if (value == null) return out;
@@ -154,6 +170,14 @@
   }
 
 
+
+  
+  function windowMsForResolution(resType, resNum){
+    const n = Math.max(1, Number(resNum || 1));
+    const t = String(resType || 'm').trim().toLowerCase();
+    const unitMs = (t === 's') ? 1000 : (t === 'm') ? 60_000 : (t === 'h') ? 3_600_000 : (t === 'd') ? 86_400_000 : 60_000;
+    return unitMs * n;
+  }
 
   function parseLocalYYYYMMDDHHmm(s){
     const t = String(s||'').trim();
@@ -228,9 +252,31 @@
       end = formatLocalYYYYMMDDHHmm(endDate);
       start = formatLocalYYYYMMDDHHmm(startDate);
       const fm = (fetchModeEl?.value || 'window').toLowerCase();
-      if (fm === 'point') {
-        // Ask for a single point at EndTime (some APIs treat this as cheapest)
-        start = end;
+      // Auto-clamp to point mode if the API has rejected ops repeatedly
+      const autoPoint = adaptiveFactor >= 4;
+      const usePoint = (fm === 'point') || autoPoint;
+      if (usePoint) {
+        // Request the smallest interval that can still produce a value at the chosen resolution.
+        const safeEnd = new Date(Date.now() - 2 * 60 * 1000);
+        end = formatLocalYYYYMMDDHHmm(safeEnd);
+        const resTypeTmp = (resTypeEl?.value || 'm').trim();
+        // Use the (possibly adaptive) resolution number
+        const resNumTmp = Math.max(1, Math.floor(Number(resNumEl?.value || 1) * Math.max(1, adaptiveFactor)));
+        const wMs = windowMsForResolution(resTypeTmp, resNumTmp);
+        const startDate2 = new Date(safeEnd.getTime() - wMs);
+        start = formatLocalYYYYMMDDHHmm(startDate2);
+      } else {
+
+        // Keep streaming window small to avoid read-operation limits
+        const eD = parseLocalYYYYMMDDHHmm(end);
+        if (eD) {
+          const maxWindowMin = adaptiveFactor > 1 ? 5 : 10;
+          const sD = parseLocalYYYYMMDDHHmm(start);
+          if (sD && (eD.getTime() - sD.getTime()) > maxWindowMin * 60 * 1000) {
+            const newStart = new Date(eD.getTime() - maxWindowMin * 60 * 1000);
+            start = formatLocalYYYYMMDDHHmm(newStart);
+          }
+        }
       }
     }
 
@@ -355,7 +401,7 @@
             // Reduce chunk size to minimum to survive strict limits
             try { if (chunkSizeEl) chunkSizeEl.value = 1; } catch {}
             // Slow down slightly
-            try { if (pollMsEl && Number(pollMsEl.value) < 15000) pollMsEl.value = 15000; } catch {}
+            try { if (pollMsEl && Number(pollMsEl.value) < 30000) pollMsEl.value = 30000; } catch {}
             lastOpsExceededAt = now;
           }
         }
@@ -364,7 +410,7 @@
         const adaptNote = adaptiveFactor > 1 ? ` · adaptive×${adaptiveFactor}` : '';
         const tagCountReq = Array.isArray(tagsChunk) ? tagsChunk.length : ((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).slice(0,10).length);
         const chunk = Array.isArray(tagsChunk) ? tagsChunk.length : Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 1)));
-        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime} · tags=${tagCountReq} · res=${body.ResolutionType}${body.ResolutionNumber} · chunk=${chunk}`
+        setApiStatus(`API: /MeasurementMulti HTTP ${res.status} (${ms}ms) · Start=${body.StartTime} End=${body.EndTime} · tags=${tagCountReq} · res=${body.ResolutionType}${body.ResolutionNumber} · chunk=${chunk} · fetch=${(fetchModeEl?.value||'window')}`
           + (snippet ? ` · ${snippet}` : '')
           + capNote + adaptNote
         );
@@ -373,6 +419,11 @@
         return false;
       }
 
+      // If the API returns empty arrays, it usually means the interval+resolution produced 0 points.
+      const anyData = payloadHasAnyData(payload);
+      if (!anyData) {
+        enqueueToken(' NO_DATA ');
+      }
       normalizeApiPayload(payload);
       // Update delta cursor only on success
       try {
@@ -383,7 +434,7 @@
       const bodyUsed2 = buildMeasurementBody();
       const tagCountReq = Array.isArray(tagsChunk) ? tagsChunk.length : ((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).slice(0,10).length);
       const chunk = Array.isArray(tagsChunk) ? tagsChunk.length : Math.max(1, Math.min(10, Number(chunkSizeEl?.value || 1)));
-      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length} · tags=${tagCountReq} · res=${bodyUsed2.ResolutionType}${bodyUsed2.ResolutionNumber} · chunk=${chunk}`
+      setApiStatus(`API: /MeasurementMulti OK (${ms}ms) · injicerar data · queue=${dataQueue.length} · tags=${tagCountReq} · res=${bodyUsed2.ResolutionType}${bodyUsed2.ResolutionNumber} · chunk=${chunk} · fetch=${(fetchModeEl?.value||'window')}` + (anyData ? '' : ' · (0 punkter — öka fönster eller sänk upplösning)')
         + (adaptiveFactor > 1 ? ` · adaptive×${adaptiveFactor}` : '')
         + (((tagsEl?.value||'').split(/\r?\n/).map(t=>t.trim()).filter(Boolean).length) > 20 ? ' · taggar: kapade till 20' : '')
       );
@@ -631,4 +682,3 @@
   if (hudClose) hudClose.addEventListener('click', () => toggleHud(false));
 
 })();
-
