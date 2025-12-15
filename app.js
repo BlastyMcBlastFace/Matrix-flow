@@ -141,7 +141,7 @@
         cache: 'no-store',
         headers: {
        'Authorization': 'Bearer ff2d6750f4184ddcb46a162eeea82d54',
-       'X-API-Key': 'DIN_NYCKEL_HÄR',
+       'X-API-Key': 'ff2d6750f4184ddcb46a162eeea82d54',
         }
 });
         // If endpoint isn't JSON, we'll still read as text
