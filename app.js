@@ -144,6 +144,18 @@
 
 
   function pad2(n){ return String(n).padStart(2,'0'); }
+
+  function normalizeTimeInput(s){
+    const t = String(s||'').trim();
+    if (!t) return '';
+    // If ISO-like, try to convert to local YYYY-MM-DD HH:mm
+    if (t.includes('T')) {
+      const d = new Date(t);
+      if (!isNaN(d.getTime())) return formatLocalYYYYMMDDHHmm(d);
+    }
+    return t;
+  }
+
   function formatLocalYYYYMMDDHHmm(d){
     const y = d.getFullYear();
     const m = pad2(d.getMonth()+1);
@@ -165,14 +177,15 @@
     const rawTags = (tagsEl?.value || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean);
 
     // Manual times (what user typed)
-    let start = (startTimeEl?.value || '').trim();
-    let end = (endTimeEl?.value || '').trim();
+    let start = normalizeTimeInput(startTimeEl?.value || '');
+    let end = normalizeTimeInput(endTimeEl?.value || '');
 
     // Latest mode: compute a rolling window ending "now" in the format the API spec shows: YYYY-MM-DD HH:mm
     const tm = (timeModeEl?.value || 'manual').toLowerCase();
     if (tm === 'latest') {
       const lookback = Math.max(1, Number(lookbackMinEl?.value || 60));
-      const now = new Date();
+      // Use server-safe window: end a bit in the past to avoid "future" vs server clock (common cause of 400)
+      const now = new Date(Date.now() - 60 * 1000);
       const from = new Date(now.getTime() - lookback * 60 * 1000);
       end = formatLocalYYYYMMDDHHmm(now);
       start = formatLocalYYYYMMDDHHmm(from);
@@ -183,7 +196,7 @@
       StartTime: start,
       EndTime: end,
       ResolutionType: (resTypeEl?.value || 'h').trim(),
-      ResolutionNumber: String(resNumEl?.value || '1'),
+      ResolutionNumber: Number(resNumEl?.value || '1'),
       ReturnTimeStampType: (tsTypeEl?.value || 'LOCAL').trim(),
     };
   }

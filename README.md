@@ -25,3 +25,9 @@ I inställningarna finns **Senaste-läge**. När det är valt räknas StartTime/
 
 ## 403 vid ändring av tid
 Om du får 403 när du väljer vissa tider är det ofta att intervallet är otillåtet (t.ex. EndTime i framtiden, för stort spann, eller behörighet saknas för historik). Den här versionen visar även Start/End som faktiskt skickas samt en kort snutt av feltexten i statusraden.
+
+
+## v5.1 (400-fixar)
+- **ResolutionNumber** skickas som **number**.
+- I **Senaste-läge** sätts EndTime till **nu minus 1 minut** (undviker att servern tolkar EndTime som "i framtiden" p.g.a. klockskew).
+- ISO-inmatning i Start/End normaliseras till **YYYY-MM-DD HH:mm**.
