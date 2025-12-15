@@ -47,3 +47,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
   - lookback-fönstret krymps
   - ResolutionNumber höjs
 - Taggar hårdkapas till **20** för att undvika extrema anrop.
+
+
+## Standard: 10 taggar
+- Klicka **Hämta /Tag**: om taggfältet är tomt fylls **första 10 taggarna** automatiskt.
+- Vill du ha fasta 10 taggar oavsett /Tag-ordning: öppna `app.js` och fyll `DEFAULT_TAGS = [ ... ]`.

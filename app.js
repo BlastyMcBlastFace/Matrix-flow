@@ -74,6 +74,9 @@
   let adaptiveFactor = 1; // increases 1,2,4,8...
   let lastOpsExceededAt = 0;
   const MAX_QUEUE = 9000;
+  // Standardtaggar: fyll i era 10 taggar här (exakta namn).
+  // Alternativt: klicka "Hämta /Tag" så auto-fylls första 10 om fältet är tomt.
+  const DEFAULT_TAGS = [];
 
   function enqueueToken(tok) {
     if (tok == null) return;
@@ -289,9 +292,9 @@
         }
       }
 
-      if (tags.length && tagsEl && !tagsEl.value.trim()) tagsEl.value = tags.slice(0, 50).join('\n');
+      if (tags.length && tagsEl && !tagsEl.value.trim()) tagsEl.value = tags.slice(0, 10).join('\n');
       setApiStatus(tags.length
-        ? `API: /Tag OK (${ms}ms) · hittade ${tags.length} taggar`
+        ? `API: /Tag OK (${ms}ms) · hittade ${tags.length} taggar (fyller 10 st som standard om tomt)`
         : `API: /Tag OK (${ms}ms) · kunde inte tolka payload`);
 
       normalizeApiPayload(payload);
@@ -424,6 +427,9 @@
   if (charsetEl) charsetEl.value = saved.charset ?? 'matrix';
   if (trailEl) trailEl.value = saved.trail ?? 0.08;
   if (tagsEl) tagsEl.value = saved.tags ?? '';
+  if (tagsEl && !tagsEl.value.trim() && Array.isArray(DEFAULT_TAGS) && DEFAULT_TAGS.length) {
+    tagsEl.value = DEFAULT_TAGS.slice(0, 10).join('\n');
+  }
   if (startTimeEl) startTimeEl.value = saved.startTime ?? '2023-01-05 00:00';
   if (endTimeEl) endTimeEl.value = saved.endTime ?? '2023-01-05 12:00';
   if (resTypeEl) resTypeEl.value = saved.resType ?? 'h';
