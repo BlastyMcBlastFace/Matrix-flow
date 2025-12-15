@@ -245,12 +245,6 @@
     }
     return charset[(Math.random() * charset.length) | 0];
   }
-      liveRepeatLeft--;
-      return liveChar;
-    }
-    liveRepeatLeft = 0;
-    return charset[(Math.random() * charset.length) | 0];
-  }
 
   function setApiStatus(text) {
     if (apiStatusEl) apiStatusEl.textContent = text;
