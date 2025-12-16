@@ -188,3 +188,55 @@ kbd{
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
+
+
+/* --- Responsive settings panel --- */
+#settingsModal, .settings-modal, .modal {
+  max-height: 92vh;
+}
+
+#settingsPanel, #settings, .settings, .panel, .modal-content {
+  max-height: 92vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* If there is an inner card/container for settings, constrain it */
+.settings-card, .settingsBox, .settings-box, .hud-panel {
+  max-height: 92vh;
+  overflow: auto;
+}
+
+/* Keep header/actions visible when scrolling (if present) */
+.settings-header, .modal-header {
+  position: sticky;
+  top: 0;
+  background: rgba(2, 6, 23, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2;
+}
+
+.settings-actions, .modal-actions, .settings-footer {
+  position: sticky;
+  bottom: 0;
+  background: rgba(2, 6, 23, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2;
+  padding-top: 10px;
+}
+
+/* Mobile tweaks */
+@media (max-width: 520px) {
+  #settingsPanel, #settings, .settings, .panel, .modal-content,
+  .settings-card, .settingsBox, .settings-box, .hud-panel {
+    width: calc(100vw - 18px);
+    margin: 8px auto;
+    border-radius: 16px;
+    padding: 12px;
+  }
+  label { font-size: 13px; }
+  input, select, textarea { font-size: 14px; }
+  textarea { min-height: 120px; }
+}

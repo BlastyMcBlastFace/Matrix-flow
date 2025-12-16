@@ -174,3 +174,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 - Default `pollMs` = **600000** (10 minuter).
 - Default `repeat` = 6 så data repeteras mer mellan hämtningar.
 - Tydligare felmeddelande vid delning: mottagaren måste nå API:t (nät/VPN) och ha giltig token.
+
+
+## v6.11.8 — visa beskrivning istället för taggnamn
+- Hämtar metadata via `GET /Tag` och bygger TagName → Description.
+- I debug/tooltip används nu **Description** (om den finns) istället för TagName.
