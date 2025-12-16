@@ -37,6 +37,10 @@ body{
   color: rgba(220, 255, 235, 0.92);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  max-height: 92vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .hidden{ display:none; }

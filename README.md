@@ -179,3 +179,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## v6.11.8 — visa beskrivning istället för taggnamn
 - Hämtar metadata via `GET /Tag` och bygger TagName → Description.
 - I debug/tooltip används nu **Description** (om den finns) istället för TagName.
+
+
+## v6.11.10 — settings scroll fix
+- Settingsrutan är `#hud.hud` och hade ingen overflow/max-height.
+- Lägger `max-height:92vh` och `overflow-y:auto` direkt på `.hud` så scroll fungerar på små skärmar.
