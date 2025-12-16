@@ -184,3 +184,8 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## v6.11.10 — settings scroll fix
 - Settingsrutan är `#hud.hud` och hade ingen overflow/max-height.
 - Lägger `max-height:92vh` och `overflow-y:auto` direkt på `.hud` så scroll fungerar på små skärmar.
+
+
+## v6.11.11 — Matrix finjustering + preset
+- Lägger till **Preset: Classic Matrix** + reglage för lager/font/täthet/glow/hastighet×/fade×.
+- Classic preset sätter även charset=matrix, trail=0.08, speed=0.6.

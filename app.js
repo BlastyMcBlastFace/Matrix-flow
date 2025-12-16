@@ -85,6 +85,13 @@
   const charsetEl = document.getElementById('charset');
   const trailEl = document.getElementById('trail');
   const speedEl = document.getElementById('speed');
+  const mxPresetEl = document.getElementById('mxPreset');
+  const mxLayersEl = document.getElementById('mxLayers');
+  const mxFontEl = document.getElementById('mxFont');
+  const mxDensityEl = document.getElementById('mxDensity');
+  const mxGlowEl = document.getElementById('mxGlow');
+  const mxSpeedEl = document.getElementById('mxSpeed');
+  const mxFadeEl = document.getElementById('mxFade');
   const repeatEl = document.getElementById('repeat');
   const tagsEl = document.getElementById('tags');
   const startTimeEl = document.getElementById('startTime');
@@ -101,7 +108,20 @@
   const btnTestMeas = document.getElementById('btnTestMeas');
 
   const GREEN = 'rgba(72, 255, 132, 1)';
-  function speedScale(){
+  
+  function mxNum(el, fallback, minV, maxV){
+    const v = Number(el?.value ?? fallback);
+    if (Number.isNaN(v)) return fallback;
+    return Math.max(minV, Math.min(maxV, v));
+  }
+  function mxLayers(){ return Math.floor(mxNum(mxLayersEl, 3, 1, 4)); }
+  function mxFontBase(){ return Math.floor(mxNum(mxFontEl, 16, 10, 28)); }
+  function mxDensity(){ return mxNum(mxDensityEl, 1.0, 0.5, 2.0); }
+  function mxGlow(){ return mxNum(mxGlowEl, 1.0, 0.0, 2.0); }
+  function mxSpeed(){ return mxNum(mxSpeedEl, 1.0, 0.5, 2.0); }
+  function mxFade(){ return mxNum(mxFadeEl, 1.0, 0.5, 2.0); }
+
+function speedScale(){
     const v = Number(speedEl?.value || 0.7);
     return Math.max(0.2, Math.min(1.5, v));
   }
@@ -110,7 +130,7 @@
     return Math.max(1, Math.min(10, Math.floor(v)));
   }
 
-  const BG_FADE = () => Math.min(0.30, Math.max(0.02, Number(trailEl?.value || 0.08)));
+  const BG_FADE = () => Math.min(0.30, Math.max(0.02, Number(trailEl?.value || 0.08) * mxFade()));
 
   let W = 0, H = 0, DPR = 1;
   function resize() {
@@ -122,7 +142,10 @@
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  
+    rebuildLayers();
   }
+
   window.addEventListener('resize', resize, { passive: true });
   resize();
 
@@ -988,11 +1011,34 @@ c.y += c.speed * speedScale();
     return layer;
   }
 
-  const layers = [
-    makeLayer(12, 0.70, 0.95, 6, 0.55),
-    makeLayer(16, 0.82, 1.00, 9, 0.75),
-    makeLayer(20, 0.92, 0.85, 12, 0.95),
-  ];
+  
+  function classicLayerTable(n){
+    // base parameters approximating the classic Matrix look
+    if (n === 1) return { speed:[0.82], dens:[1.0], glow:[9], alpha:[0.75], offs:[0] };
+    if (n === 2) return { speed:[0.75,0.92], dens:[0.95,0.90], glow:[7,11], alpha:[0.65,0.95], offs:[-2,2] };
+    if (n === 4) return { speed:[0.65,0.78,0.90,1.02], dens:[0.95,1.05,0.95,0.85], glow:[5,7,10,13], alpha:[0.45,0.65,0.85,0.98], offs:[-6,-2,2,6] };
+    // default 3
+    return { speed:[0.70,0.82,0.92], dens:[0.95,1.00,0.85], glow:[6,9,12], alpha:[0.55,0.75,0.95], offs:[-4,0,4] };
+  }
+
+  let layers = [];
+  function rebuildLayers(){
+    const n = mxLayers();
+    const base = mxFontBase();
+    const tab = classicLayerTable(n);
+    const densMul = mxDensity();
+    const glowMul = mxGlow();
+    const spdMul = mxSpeed();
+    layers = new Array(n).fill(0).map((_,i)=>{
+      const fp = Math.max(10, Math.min(28, base + tab.offs[i]));
+      const speedMul = tab.speed[i] * spdMul * speedScale();
+      const densityMul = tab.dens[i] * densMul;
+      const glow = tab.glow[i] * glowMul;
+      const alphaMul = tab.alpha[i];
+      return makeLayer(fp, speedMul, densityMul, glow, alphaMul);
+    });
+  }
+
 
   let paused = false;
   function frame() {
@@ -1031,3 +1077,39 @@ c.y += c.speed * speedScale();
   if (hudClose) hudClose.addEventListener('click', () => toggleHud(false));
 
 })();
+
+
+  function onMatrixTuningChange(){
+    try{ rebuildLayers(); } catch {}
+    try{ saveSettings(); } catch {}
+  }
+
+  [mxLayersEl, mxFontEl, mxDensityEl, mxGlowEl, mxSpeedEl, mxFadeEl].forEach(el=>{
+    if (!el) return;
+    el.addEventListener('input', onMatrixTuningChange);
+    el.addEventListener('change', onMatrixTuningChange);
+  });
+
+  function applyPreset(preset){
+    if (!preset || preset === 'custom') return;
+    if (preset === 'classic') {
+      // Classic Matrix defaults
+      try { charsetEl.value = 'matrix'; } catch {}
+      try { trailEl.value = 0.08; } catch {}
+      try { speedEl.value = 0.6; } catch {}
+      try { mxLayersEl.value = 3; } catch {}
+      try { mxFontEl.value = 16; } catch {}
+      try { mxDensityEl.value = 1.0; } catch {}
+      try { mxGlowEl.value = 1.0; } catch {}
+      try { mxSpeedEl.value = 1.0; } catch {}
+      try { mxFadeEl.value = 1.0; } catch {}
+      onMatrixTuningChange();
+    }
+  }
+
+  if (mxPresetEl){
+    mxPresetEl.addEventListener('change', ()=>{
+      try{ saveSettings(); }catch{}
+      applyPreset(mxPresetEl.value);
+    });
+  }
