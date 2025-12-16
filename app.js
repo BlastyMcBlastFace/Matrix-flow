@@ -10,6 +10,14 @@
 
   const canvas = document.getElementById('matrix');
   const tooltipEl = document.getElementById('tooltip');
+  // Tag metadata (TagName -> { description }) fetched from GET /Tag
+  const tagMeta = new Map();
+  function resolveLabel(tagName){
+    const t = String(tagName || '').trim();
+    const m = tagMeta.get(t);
+    return (m && m.description) ? String(m.description) : t;
+  }
+
   const hoverRegions = []; // per-frame regions for head tokens
   let mousePx = { x: -1, y: -1, inside: false };
   function canvasToLocal(e){
@@ -33,7 +41,9 @@
     if (hit) {
       const tag = hit.headObj?.tag ? String(hit.headObj.tag) : '(okänd tag)';
       const val = hit.value ? String(hit.value) : '';
-      showTooltip(mousePx.pageX, mousePx.pageY, `${tag}\n${val}`);
+      const label = hit.headObj?.label || hit.headObj?.tag || tag;
+      const showTag = hit.headObj?.tag && hit.headObj.tag !== label ? `\n(${hit.headObj.tag})` : '';
+      showTooltip(mousePx.pageX, mousePx.pageY, `${label}\n${val}${showTag}`);
     } else {
       hideTooltip();
     }
@@ -142,8 +152,8 @@
     const v = String(value ?? '').trim();
     const t = String(tag ?? '').trim();
     if (!v) return;
-    addToHeadPool({ tag: t, value: v });
-    valueQueue.push({ tag: t, value: v });
+    addToHeadPool({ tag: t, label: resolveLabel(t), value: v });
+    valueQueue.push({ tag: t, label: resolveLabel(t), value: v });
     if (valueQueue.length > MAX_VALUE_QUEUE) valueQueue.splice(0, valueQueue.length - MAX_VALUE_QUEUE);
   }
 
