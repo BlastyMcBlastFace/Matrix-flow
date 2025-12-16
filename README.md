@@ -168,3 +168,9 @@ Operations ~ (antal taggar) × (antal tidssteg i intervallet). Minska taggar, ko
 ## v6.11.6 — hover fungerar även vid paus
 - `requestAnimationFrame(frame)` fortsätter även när sidan är pausad.
 - Hover-regioner behålls när pausad (så tooltip kan träffa samma headtokens).
+
+
+## v6.11.7 — fetch var 10:e minut + tydligare delning
+- Default `pollMs` = **600000** (10 minuter).
+- Default `repeat` = 6 så data repeteras mer mellan hämtningar.
+- Tydligare felmeddelande vid delning: mottagaren måste nå API:t (nät/VPN) och ha giltig token.
